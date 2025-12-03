@@ -11,20 +11,20 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.555.0",
-    "next": "16.0.5",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
-    "recharts": "^3.5.1",
-    "tailwind-merge": "^3.4.0"
+    "lucide-react": "^0.460.0",
+    "next": "15.0.3",
+    "react": "19.0.0-rc-66855b96-20241106",
+    "react-dom": "19.0.0-rc-66855b96-20241106",
+    "recharts": "^2.13.3",
+    "tailwind-merge": "^2.5.4"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.0.0-alpha.31",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.0.5",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "eslint": "^8",
+    "eslint-config-next": "15.0.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
