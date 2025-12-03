@@ -1,4 +1,5 @@
 'use client'
+// Trigger Vercel rebuild
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
