@@ -99,11 +99,16 @@ export function Sidebar() {
             </nav>
             <div className="border-t border-gray-800 p-6 bg-black/50">
                 <div className="flex items-center group cursor-pointer">
-                    <div className="h-10 w-10 rounded-full bg-indigo-500 flex items-center justify-center text-white shadow-md ring-2 ring-gray-800 group-hover:ring-indigo-500 transition-all">
-                        <User className="h-5 w-5" />
+                    <div className="relative h-10 w-10 rounded-full overflow-hidden ring-2 ring-gray-800 group-hover:ring-indigo-500 transition-all">
+                        <Image
+                            src="/owl-avatar.png"
+                            alt="zip Agent"
+                            fill
+                            className="object-cover"
+                        />
                     </div>
                     <div className="ml-3">
-                        <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors">Agent</p>
+                        <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors">zip Agent</p>
                         <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">View Profile</p>
                     </div>
                 </div>
