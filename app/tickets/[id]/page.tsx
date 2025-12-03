@@ -126,7 +126,7 @@ export default function TicketDetail() {
         if (ticket?.users?.email) {
             if (translate) setIsTranslating(true)
             try {
-                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
+                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/208af0aa-93df-485d-b75a-2eda2c0b8086', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -284,7 +284,7 @@ export default function TicketDetail() {
                                 >
                                     <p className="whitespace-pre-wrap">{message.content}</p>
 
-                                    {!isAgent && message.content_translated && (
+                                    {!isAgent && message.content_translated && !['en', 'english'].includes(ticket.language?.toLowerCase()) && (
                                         <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                                 {message.content_translated}
