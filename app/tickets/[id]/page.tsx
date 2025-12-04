@@ -126,7 +126,7 @@ export default function TicketDetail() {
         if (ticket?.users?.email) {
             if (translate) setIsTranslating(true)
             try {
-                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/208af0aa-93df-485d-b75a-2eda2c0b8086', {
+                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -153,6 +153,7 @@ export default function TicketDetail() {
                 }
             } catch (err) {
                 console.error('Error triggering email webhook:', err)
+                alert('Failed to trigger webhook: ' + err)
             } finally {
                 if (translate) setIsTranslating(false)
             }
@@ -227,33 +228,39 @@ export default function TicketDetail() {
 
                 <div className="border-b bg-white dark:bg-gray-900 p-4 shadow-sm">
                     <div className="flex items-center justify-between">
-                        <div>
-                            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                                #{ticket.ticket_id} - {ticket.subject}
-                            </h1>
-                            <p className="text-sm text-gray-500">
-                                {ticket.users?.email} • {ticket.language || 'Unknown Language'}
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                                {ticket.sentiment && (
-                                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${ticket.sentiment.toLowerCase().includes('positive') ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' :
-                                        ticket.sentiment.toLowerCase().includes('negative') || ticket.sentiment.toLowerCase().includes('angry') ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800' :
-                                            'bg-gray-50 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'
-                                        }`}>
-                                        {ticket.sentiment}
+                        <div className="flex-1 min-w-0 mr-4">
+                            <div className="flex items-center gap-3 mb-1">
+                                <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
+                                    #{ticket.ticket_id} - {ticket.subject}
+                                </h1>
+                                {ticket.importance === 'important' && (
+                                    <span className="flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800">
+                                        Important
                                     </span>
                                 )}
-                                {ticket.tags && ticket.tags.map((tag: string, idx: number) => (
-                                    <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800">
-                                        {tag}
-                                    </span>
-                                ))}
+                            </div>
+                            <div className="flex items-center flex-wrap gap-2 text-sm text-gray-500">
+                                <span>{ticket.users?.email}</span>
+                                <span>•</span>
+                                <span>{ticket.language || 'Unknown Language'}</span>
+                                {ticket.tags && ticket.tags.length > 0 && (
+                                    <>
+                                        <span>•</span>
+                                        <div className="flex items-center gap-1">
+                                            {ticket.tags.map((tag: string, idx: number) => (
+                                                <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800">
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-2 flex-shrink-0">
                             <button
                                 onClick={toggleStatus}
-                                className={`px-2 py-1 text-xs font-semibold rounded-full cursor-pointer transition-colors hover:opacity-80 flex items-center gap-1
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-full cursor-pointer transition-colors hover:opacity-80 flex items-center gap-1
                   ${ticket.status === 'open' ? 'bg-green-100 text-green-800' :
                                         ticket.status === 'closed' ? 'bg-gray-100 text-gray-800' :
                                             'bg-yellow-100 text-yellow-800'}`}
@@ -284,7 +291,7 @@ export default function TicketDetail() {
                                 >
                                     <p className="whitespace-pre-wrap">{message.content}</p>
 
-                                    {!isAgent && message.content_translated && !['en', 'english'].includes(ticket.language?.toLowerCase()) && (
+                                    {!isAgent && message.content_translated && (
                                         <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
                                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                                 {message.content_translated}
@@ -419,6 +426,21 @@ export default function TicketDetail() {
                         </div>
                     </div>
                 </div>
+
+
+                {/* Tags Section */}
+                {ticket.tags && ticket.tags.length > 0 && (
+                    <div className="mb-6">
+                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 border-b pb-2">Tags</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {ticket.tags.map((tag: string, idx: number) => (
+                                <span key={idx} className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                    {tag}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Device Info */}
                 <div className="mb-6">

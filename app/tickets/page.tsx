@@ -545,6 +545,7 @@ export default function TicketList() {
                                         className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                                     />
                                 </th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">Imp.</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">ID</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Game</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
@@ -556,7 +557,7 @@ export default function TicketList() {
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-800">
                             {tickets.length === 0 && !loading ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                                         No tickets found matching your filters.
                                     </td>
                                 </tr>
@@ -580,6 +581,15 @@ export default function TicketList() {
                                                     className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 dark:border-gray-700 dark:bg-gray-900 transition-colors"
                                                 />
                                             </div>
+                                        </td>
+                                        <td className="px-3 py-4 whitespace-nowrap w-8">
+                                            <div
+                                                className={`w-3 h-3 rounded-full mx-auto ${ticket.importance === 'important' ? 'bg-red-500' :
+                                                        ticket.importance === 'not_important' ? 'bg-gray-200 dark:bg-gray-700' :
+                                                            'bg-gray-400'
+                                                    }`}
+                                                title={ticket.importance === 'important' ? 'Important' : ticket.importance === 'not_important' ? 'Not Important' : 'Normal'}
+                                            />
                                         </td>
                                         <td className="px-3 py-4 whitespace-nowrap w-16">
                                             <span className="text-xs font-medium text-gray-500 dark:text-gray-400">#{ticket.ticket_id}</span>
@@ -648,7 +658,7 @@ export default function TicketList() {
                             {/* Loading Skeleton / Infinite Scroll Target */}
                             {(loading || loadingMore) && (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-4 text-center">
+                                    <td colSpan={8} className="px-6 py-4 text-center">
                                         <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent"></div>
                                     </td>
                                 </tr>
