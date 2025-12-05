@@ -126,7 +126,7 @@ export default function TicketDetail() {
         if (ticket?.users?.email) {
             if (translate) setIsTranslating(true)
             try {
-                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
+                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -393,7 +393,22 @@ export default function TicketDetail() {
 
             {/* Sidebar for Game Data */}
             <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 overflow-y-auto p-4">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{ticket.game_name || 'Game Data'}</h2>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{ticket.game_name || 'Game Data'}</h2>
+                    {ticket.project_id && ticket.unity_report_id && (
+                        <a
+                            href={`https://cloud.unity.com/home/organizations/10024/projects/${ticket.project_id}/cloud-diagnostics/user-reports/${ticket.unity_report_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 transition-colors"
+                        >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            Unity Cloud
+                        </a>
+                    )}
+                </div>
 
                 {/* Key Stats */}
                 <div className="space-y-4 mb-6">
