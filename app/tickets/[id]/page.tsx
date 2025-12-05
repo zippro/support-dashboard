@@ -230,6 +230,11 @@ export default function TicketDetail() {
                     <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0 mr-4">
                             <div className="flex items-center gap-3 mb-1">
+                                <span className="text-2xl" title={ticket.sentiment || 'Unknown'}>
+                                    {ticket.sentiment === 'Positive' ? '😊' :
+                                        ticket.sentiment === 'Negative' ? '😟' :
+                                            ticket.sentiment === 'Angry' ? '😡' : '😐'}
+                                </span>
                                 <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
                                     #{ticket.ticket_id} - {ticket.subject}
                                 </h1>
@@ -250,6 +255,18 @@ export default function TicketDetail() {
                                             {ticket.tags.map((tag: string, idx: number) => (
                                                 <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-800">
                                                     {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                                {ticket.keywords && ticket.keywords.length > 0 && (
+                                    <>
+                                        <span>•</span>
+                                        <div className="flex items-center gap-1">
+                                            {ticket.keywords.map((keyword: string, idx: number) => (
+                                                <span key={idx} className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
+                                                    🔑 {keyword}
                                                 </span>
                                             ))}
                                         </div>
