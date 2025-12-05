@@ -428,7 +428,7 @@ export default function TicketDetail() {
                         <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                             <p className="text-xs text-gray-500 uppercase">Is Buyer</p>
                             <div className="flex items-center h-7">
-                                {ticket.game_data?.is_buyer ? (
+                                {(ticket.game_data?.is_buyer || ticket.game_data?.Is_Buyer || ticket.game_data?.IsBuyer) ? (
                                     <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
                                         <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
