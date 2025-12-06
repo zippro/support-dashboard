@@ -18,7 +18,7 @@ export default function TicketDetail() {
     const [showQuickReplies, setShowQuickReplies] = useState(false)
     const [isTranslating, setIsTranslating] = useState(false)
     const [showCloseModal, setShowCloseModal] = useState(false)
-    const [pendingMessage, setPendingMessage] = useState<{ content: string, translate: boolean } | null>(null)
+    const [pendingMessage, setPendingMessage] = useState<{ original: string, translated: string | null, translate: boolean } | null>(null)
     const [attachment, setAttachment] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -404,7 +404,7 @@ export default function TicketDetail() {
                             type="button"
                             onClick={() => {
                                 if (newMessage.trim()) {
-                                    setPendingMessage({ content: newMessage, translate: false })
+                                    setPendingMessage({ original: newMessage, translated: null, translate: false })
                                     setShowCloseModal(true)
                                 }
                             }}
@@ -416,10 +416,36 @@ export default function TicketDetail() {
                         </button>
                         <button
                             type="button"
-                            onClick={() => {
-                                if (newMessage.trim()) {
-                                    setPendingMessage({ content: newMessage, translate: true })
-                                    setShowCloseModal(true)
+                            onClick={async () => {
+                                if (newMessage.trim() && ticket?.users?.email) {
+                                    setIsTranslating(true)
+                                    try {
+                                        const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                ticket_id: id,
+                                                message: newMessage,
+                                                user_email: ticket.users.email,
+                                                subject: ticket.subject,
+                                                language: ticket.language,
+                                                translate: true,
+                                                preview_only: true,
+                                                game_name: ticket.game_name || 'Support'
+                                            })
+                                        })
+                                        if (response.ok) {
+                                            const data = await response.json()
+                                            setPendingMessage({ original: newMessage, translated: data.message || newMessage, translate: true })
+                                        } else {
+                                            setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
+                                        }
+                                    } catch (err) {
+                                        setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
+                                    } finally {
+                                        setIsTranslating(false)
+                                        setShowCloseModal(true)
+                                    }
                                 }
                             }}
                             disabled={!newMessage.trim() || isTranslating}
@@ -464,16 +490,35 @@ export default function TicketDetail() {
                                     </div>
                                     <div>
                                         <p className="font-medium text-gray-900 dark:text-white">
-                                            {pendingMessage?.translate ? 'Translate and send this message?' : 'Send this message?'}
+                                            {pendingMessage?.translate ? 'Send translated message?' : 'Send this message?'}
                                         </p>
                                         <p className="text-sm text-gray-500 dark:text-gray-400">To: {ticket.users?.email}</p>
                                     </div>
                                 </div>
-                                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
-                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{pendingMessage?.content}</p>
-                                </div>
-                                {pendingMessage?.translate && (
-                                    <p className="text-xs text-purple-600 dark:text-purple-400 italic">Message will be translated to {ticket.language || 'user language'}</p>
+
+                                {pendingMessage?.translate && pendingMessage?.translated ? (
+                                    <div className="space-y-3">
+                                        <div>
+                                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Original (English)</p>
+                                            <div className="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                                                <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{pendingMessage.original}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                                            <Languages className="h-4 w-4" />
+                                            <span className="text-xs font-medium">Translated from English → {ticket.language || 'User Language'}</span>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">Translated Message</p>
+                                            <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
+                                                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{pendingMessage.translated}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{pendingMessage?.original}</p>
+                                    </div>
                                 )}
                             </div>
                             <div className="flex gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800">
