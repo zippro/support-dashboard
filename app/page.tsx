@@ -19,7 +19,10 @@ import {
 } from 'recharts'
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+const SENTIMENT_EMOJIS = { Positive: '😊', Neutral: '😐', Negative: '😟', Angry: '😡' }
 const SENTIMENT_COLORS = { Positive: '#10B981', Neutral: '#6B7280', Negative: '#F59E0B', Angry: '#EF4444' }
+
+type GamePeriod = 'today' | 'week' | 'month' | 'all'
 
 function StatCard({ title, value, icon: Icon, color, trend, trendLabel, subtext }: any) {
   const isPositive = trend > 0
@@ -51,16 +54,39 @@ function StatCard({ title, value, icon: Icon, color, trend, trendLabel, subtext 
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({
-    total: 0, open: 0, closed: 0, pending: 0, totalTrend: 0, openTrend: 0, important: 0
-  })
+  const [stats, setStats] = useState({ total: 0, open: 0, closed: 0, pending: 0, totalTrend: 0, openTrend: 0, important: 0 })
+  const [allTickets, setAllTickets] = useState<any[]>([])
+  const [projectMap, setProjectMap] = useState<Record<string, string>>({})
   const [gameStats, setGameStats] = useState<any[]>([])
+  const [gamePeriod, setGamePeriod] = useState<GamePeriod>('all')
   const [timelineData, setTimelineData] = useState<any[]>([])
   const [todaySentiment, setTodaySentiment] = useState<any[]>([])
   const [comparisonData, setComparisonData] = useState<any[]>([])
   const [topTags, setTopTags] = useState<any[]>([])
+  const [tagCloud, setTagCloud] = useState<any[]>([])
   const [insights, setInsights] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Compute game stats based on period
+  const computeGameStats = (tickets: any[], period: GamePeriod, pMap: Record<string, string>) => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    let filtered = tickets
+    if (period === 'today') filtered = tickets.filter(t => new Date(t.created_at) >= todayStart)
+    else if (period === 'week') filtered = tickets.filter(t => new Date(t.created_at) >= weekAgo)
+    else if (period === 'month') filtered = tickets.filter(t => new Date(t.created_at) >= monthStart)
+
+    const projectCounts: Record<string, number> = {}
+    filtered.forEach(t => { projectCounts[t.project_id || 'Unknown'] = (projectCounts[t.project_id || 'Unknown'] || 0) + 1 })
+
+    return Object.entries(projectCounts).map(([pid, count]) => ({
+      name: pMap[pid] || 'Unknown',
+      value: count
+    })).sort((a, b) => b.value - a.value).slice(0, 5)
+  }
 
   useEffect(() => {
     async function fetchStats() {
@@ -74,20 +100,26 @@ export default function Dashboard() {
         .select('status, project_id, created_at, sentiment, importance, tags')
         .order('created_at', { ascending: true })
 
+      const { data: projects } = await supabase.from('projects').select('project_id, game_name')
+      const pMap: Record<string, string> = {}
+      projects?.forEach(p => pMap[p.project_id] = p.game_name)
+      setProjectMap(pMap)
+
       if (tickets) {
-        // 1. General Stats
+        setAllTickets(tickets)
+
         const total = tickets.length
         const open = tickets.filter(t => t.status === 'open').length
         const closed = tickets.filter(t => t.status === 'closed').length
         const pending = tickets.filter(t => t.status === 'pending').length
         const important = tickets.filter(t => t.importance === 'important').length
 
-        // 2. Today vs Yesterday
         const todayTickets = tickets.filter(t => new Date(t.created_at) >= todayStart)
         const yesterdayTickets = tickets.filter(t => {
           const d = new Date(t.created_at)
           return d >= yesterdayStart && d < todayStart
         })
+        const weekTickets = tickets.filter(t => new Date(t.created_at) >= lastWeek)
 
         const totalTrend = yesterdayTickets.length === 0 ? (todayTickets.length > 0 ? 100 : 0) :
           Math.round(((todayTickets.length - yesterdayTickets.length) / yesterdayTickets.length) * 100)
@@ -99,7 +131,6 @@ export default function Dashboard() {
 
         setStats({ total, open, closed, pending, totalTrend, openTrend, important })
 
-        // 3. Comparison Data
         setComparisonData([
           { name: 'Total', yesterday: yesterdayTickets.length, today: todayTickets.length },
           { name: 'Open', yesterday: yesterdayTickets.filter(t => t.status === 'open').length, today: todayTickets.filter(t => t.status === 'open').length },
@@ -107,37 +138,36 @@ export default function Dashboard() {
           { name: 'Important', yesterday: yesterdayTickets.filter(t => t.importance === 'important').length, today: todayTickets.filter(t => t.importance === 'important').length },
         ])
 
-        // 4. Today's Sentiment (only today)
+        // Today's Sentiment
         const todaySentimentCounts: Record<string, number> = { Positive: 0, Neutral: 0, Negative: 0, Angry: 0 }
         todayTickets.forEach(t => {
           const s = t.sentiment || 'Neutral'
           if (todaySentimentCounts[s] !== undefined) todaySentimentCounts[s]++
           else todaySentimentCounts['Neutral']++
         })
-        setTodaySentiment(Object.entries(todaySentimentCounts).map(([name, value]) => ({ name, value })))
+        setTodaySentiment(Object.entries(todaySentimentCounts).map(([name, value]) => ({ name, value, emoji: SENTIMENT_EMOJIS[name as keyof typeof SENTIMENT_EMOJIS] })))
 
-        // 5. Top Tags
+        // Top Tags (Last 7 Days)
         const tagCounts: Record<string, number> = {}
-        tickets.forEach(t => {
+        weekTickets.forEach(t => {
           const tags = t.tags || []
           tags.forEach((tag: string) => { tagCounts[tag] = (tagCounts[tag] || 0) + 1 })
         })
-        setTopTags(Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value })))
+        const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1])
+        setTopTags(sortedTags.slice(0, 5).map(([name, value]) => ({ name, value })))
 
-        // 6. Game Stats
-        const projectCounts: Record<string, number> = {}
-        tickets.forEach(t => { projectCounts[t.project_id || 'Unknown'] = (projectCounts[t.project_id || 'Unknown'] || 0) + 1 })
+        // Tag Cloud (all tags from last 7 days)
+        const maxCount = sortedTags.length > 0 ? sortedTags[0][1] : 1
+        setTagCloud(sortedTags.slice(0, 15).map(([name, value]) => ({
+          name,
+          value,
+          size: Math.max(0.7, Math.min(1.5, (value / maxCount) * 1.5 + 0.5))
+        })))
 
-        const { data: projects } = await supabase.from('projects').select('project_id, game_name')
-        const projectMap: Record<string, string> = {}
-        projects?.forEach(p => projectMap[p.project_id] = p.game_name)
+        // Game Stats
+        setGameStats(computeGameStats(tickets, gamePeriod, pMap))
 
-        setGameStats(Object.entries(projectCounts).map(([pid, count]) => ({
-          name: projectMap[pid] || 'Unknown',
-          value: count
-        })).sort((a, b) => b.value - a.value).slice(0, 5))
-
-        // 7. Timeline (Last 7 Days)
+        // Timeline
         const daysMap: Record<string, number> = {}
         for (let i = 6; i >= 0; i--) {
           const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
@@ -152,28 +182,18 @@ export default function Dashboard() {
         })
         setTimelineData(Object.entries(daysMap).map(([date, count]) => ({ date, tickets: count })))
 
-        // 8. AI Insights
+        // AI Insights
         const newInsights: any[] = []
-
-        // Volume change alert
         if (totalTrend > 50) newInsights.push({ type: 'warning', icon: ArrowUp, message: `Ticket volume up ${totalTrend}% today`, color: 'text-orange-500' })
         else if (totalTrend < -30) newInsights.push({ type: 'success', icon: ArrowDown, message: `Ticket volume down ${Math.abs(totalTrend)}% today`, color: 'text-green-500' })
-
-        // Angry sentiment alert
         const angryToday = todayTickets.filter(t => t.sentiment === 'Angry').length
         if (angryToday > 0) newInsights.push({ type: 'alert', icon: AlertTriangle, message: `${angryToday} angry customer${angryToday > 1 ? 's' : ''} today - needs attention!`, color: 'text-red-500' })
-
-        // Important tickets
         const importantOpen = tickets.filter(t => t.importance === 'important' && t.status === 'open').length
         if (importantOpen > 0) newInsights.push({ type: 'alert', icon: AlertCircle, message: `${importantOpen} important ticket${importantOpen > 1 ? 's' : ''} still open`, color: 'text-red-500' })
-
-        // Resolution rate
         const resolutionRate = total > 0 ? Math.round((closed / total) * 100) : 0
         if (resolutionRate > 80) newInsights.push({ type: 'success', icon: CheckCircle, message: `Great job! ${resolutionRate}% resolution rate`, color: 'text-green-500' })
         else if (resolutionRate < 50) newInsights.push({ type: 'warning', icon: AlertTriangle, message: `Resolution rate at ${resolutionRate}% - needs improvement`, color: 'text-orange-500' })
-
         if (newInsights.length === 0) newInsights.push({ type: 'info', icon: CheckCircle, message: 'No alerts - everything looks good!', color: 'text-green-500' })
-
         setInsights(newInsights)
       }
       setLoading(false)
@@ -183,6 +203,15 @@ export default function Dashboard() {
     const channel = supabase.channel('dashboard-stats').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchStats()).subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
+
+  // Update game stats when period changes
+  useEffect(() => {
+    if (allTickets.length > 0) {
+      setGameStats(computeGameStats(allTickets, gamePeriod, projectMap))
+    }
+  }, [gamePeriod, allTickets, projectMap])
+
+  const gamePeriodTotal = gameStats.reduce((sum, g) => sum + g.value, 0)
 
   if (loading) {
     return (
@@ -229,11 +258,25 @@ export default function Dashboard() {
         <StatCard title="Resolved" value={stats.closed} icon={CheckCircle} color="bg-green-500" subtext="Successfully closed" />
       </div>
 
-      {/* Charts Row 1: Games Pie + Today's Sentiment */}
+      {/* Charts Row 1: Games Pie with Tabs */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Games Pie Chart */}
+        {/* Games Pie Chart with Tabs */}
         <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tickets by Game</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tickets by Game</h3>
+            <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+              {(['today', 'week', 'month', 'all'] as GamePeriod[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setGamePeriod(p)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${gamePeriod === p ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    }`}
+                >
+                  {p === 'today' ? 'Today' : p === 'week' ? '7 Days' : p === 'month' ? 'Month' : 'All'}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="h-[220px] w-full relative">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -246,8 +289,8 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
-              <span className="text-xs text-gray-500">Total</span>
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">{gamePeriodTotal}</span>
+              <span className="text-xs text-gray-500">{gamePeriod === 'today' ? 'Today' : gamePeriod === 'week' ? '7 Days' : gamePeriod === 'month' ? 'Month' : 'Total'}</span>
             </div>
           </div>
           <div className="flex flex-wrap justify-center gap-3 mt-2">
@@ -260,29 +303,39 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Today's Sentiment */}
+        {/* Top Tags (Last 7 Days) */}
         <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Today's Sentiment</h3>
-          <div className="h-[220px] w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={todaySentiment} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                  {todaySentiment.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={SENTIMENT_COLORS[entry.name as keyof typeof SENTIMENT_COLORS] || '#6B7280'} strokeWidth={0} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-4 mt-2">
-            {todaySentiment.map((s, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SENTIMENT_COLORS[s.name as keyof typeof SENTIMENT_COLORS] }} />
-                <span className="text-gray-600 dark:text-gray-300">{s.name}: {s.value}</span>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Tags <span className="text-sm font-normal text-gray-500">(Last 7 Days)</span></h3>
+          {topTags.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No tags yet</div>
+          ) : (
+            <div className="flex flex-wrap gap-3">
+              {topTags.map((tag, i) => (
+                <div key={i} className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-full">
+                  <span className="text-indigo-700 dark:text-indigo-300 font-medium">{tag.name}</span>
+                  <span className="bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 text-xs px-2 py-0.5 rounded-full font-bold">{tag.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Tag Cloud */}
+          {tagCloud.length > 0 && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-800">
+              <p className="text-xs text-gray-500 mb-3">Tag Cloud</p>
+              <div className="flex flex-wrap gap-2 items-center justify-center">
+                {tagCloud.map((tag, i) => (
+                  <span
+                    key={i}
+                    className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors cursor-default"
+                    style={{ fontSize: `${tag.size}rem` }}
+                  >
+                    {tag.name}
+                  </span>
+                ))}
               </div>
-            ))}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -328,21 +381,20 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Top Tags */}
+      {/* Today's Sentiment with Emojis - At the End */}
       <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Tags</h3>
-        {topTags.length === 0 ? (
-          <div className="text-center py-4 text-gray-500">No tags yet</div>
-        ) : (
-          <div className="flex flex-wrap gap-3">
-            {topTags.map((tag, i) => (
-              <div key={i} className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-full">
-                <span className="text-indigo-700 dark:text-indigo-300 font-medium">{tag.name}</span>
-                <span className="bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 text-xs px-2 py-0.5 rounded-full font-bold">{tag.value}</span>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Today's Sentiment</h3>
+        <div className="flex items-center justify-center gap-8">
+          {todaySentiment.map((s, i) => (
+            <div key={i} className="flex flex-col items-center gap-2">
+              <span className="text-4xl">{s.emoji}</span>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900 dark:text-white">{s.value}</p>
+                <p className="text-xs text-gray-500">{s.name}</p>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )
