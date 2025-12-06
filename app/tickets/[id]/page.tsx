@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useParams } from 'next/navigation'
-import { Send, ChevronDown, MessageSquare, Languages } from 'lucide-react'
+import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle } from 'lucide-react'
 
 export default function TicketDetail() {
     const { id } = useParams()
@@ -17,6 +17,10 @@ export default function TicketDetail() {
     const [quickReplies, setQuickReplies] = useState<{ title: string, reply: string }[]>([])
     const [showQuickReplies, setShowQuickReplies] = useState(false)
     const [isTranslating, setIsTranslating] = useState(false)
+    const [showCloseModal, setShowCloseModal] = useState(false)
+    const [pendingMessage, setPendingMessage] = useState<{ content: string, translate: boolean } | null>(null)
+    const [attachment, setAttachment] = useState<File | null>(null)
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         async function fetchQuickReplies() {
@@ -379,6 +383,23 @@ export default function TicketDetail() {
                             placeholder="Type your reply..."
                             className="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
                         />
+                        {/* Attachment Button */}
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={(e) => setAttachment(e.target.files?.[0] || null)}
+                            className="hidden"
+                            accept="image/*,.pdf,.doc,.docx,.txt"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className={`inline-flex items-center justify-center rounded-md border px-3 py-2 transition-colors ${attachment ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                            title={attachment ? attachment.name : 'Add Attachment'}
+                        >
+                            <Paperclip className="h-4 w-4" />
+                        </button>
+
                         <button
                             type="submit"
                             disabled={!newMessage.trim() || isTranslating}
@@ -398,14 +419,83 @@ export default function TicketDetail() {
                         </button>
                         <button
                             type="button"
-                            onClick={(e) => sendMessage(e, true)}
+                            onClick={() => {
+                                if (newMessage.trim()) {
+                                    setPendingMessage({ content: newMessage, translate: false })
+                                    setShowCloseModal(true)
+                                }
+                            }}
                             disabled={!newMessage.trim() || isTranslating}
-                            className="inline-flex items-center justify-center rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:opacity-50 transition-colors text-sm font-medium"
+                            className="inline-flex items-center justify-center rounded-md border-2 border-green-600 text-green-600 dark:text-green-400 dark:border-green-500 px-4 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-50 transition-colors text-sm font-medium"
                         >
-                            Send & Close
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            Close Ticket
                         </button>
                     </form>
+
+                    {/* Attachment Preview */}
+                    {attachment && (
+                        <div className="mt-2 flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <Paperclip className="h-3 w-3" />
+                            <span className="truncate max-w-xs">{attachment.name}</span>
+                            <button onClick={() => setAttachment(null)} className="text-red-500 hover:text-red-700">
+                                <X className="h-3 w-3" />
+                            </button>
+                        </div>
+                    )}
                 </div>
+
+                {/* Close Confirmation Modal */}
+                {showCloseModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Close Ticket</h3>
+                                <button
+                                    onClick={() => { setShowCloseModal(false); setPendingMessage(null) }}
+                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    <X className="h-5 w-5 text-gray-500" />
+                                </button>
+                            </div>
+                            <div className="p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
+                                        <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-gray-900 dark:text-white">Send message & close ticket?</p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">This will mark ticket #{ticket.ticket_id} as resolved.</p>
+                                    </div>
+                                </div>
+                                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
+                                    <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{pendingMessage?.content}</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800">
+                                <button
+                                    onClick={() => { setShowCloseModal(false); setPendingMessage(null) }}
+                                    className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={async (e) => {
+                                        if (pendingMessage) {
+                                            setShowCloseModal(false)
+                                            await sendMessage(e as any, true, false)
+                                            setPendingMessage(null)
+                                        }
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle className="h-4 w-4" />
+                                    Send & Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Sidebar for Game Data */}
@@ -564,6 +654,6 @@ export default function TicketDetail() {
                     )}
                 </div>
             </div>
-        </div >
+        </div>
     )
 }
