@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check } from 'lucide-react'
+import { useAuth } from '@/lib/auth'
+import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock } from 'lucide-react'
 
 interface Project {
     id: string
@@ -27,6 +28,7 @@ type TabType = 'games' | 'tags' | 'replies' | 'ai'
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabType>('games')
+    const { isAuthenticated } = useAuth()
 
     const [quickReplies, setQuickReplies] = useState<{ id: string, title: string, reply: string }[]>([])
     const [newReplyTitle, setNewReplyTitle] = useState('')
@@ -267,6 +269,12 @@ export default function SettingsPage() {
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your support system configuration</p>
+                    {!isAuthenticated && (
+                        <div className="mt-4 flex items-center gap-2 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl text-yellow-600 dark:text-yellow-400">
+                            <Lock className="w-5 h-5" />
+                            <span className="text-sm font-medium">Sign in to add or edit settings</span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tab Navigation */}
@@ -288,11 +296,13 @@ export default function SettingsPage() {
                             <p className="text-sm text-gray-500 mt-1">Map Unity Project IDs to readable game names</p>
                         </div>
                         <div className="p-6">
-                            <form onSubmit={addProject} className="flex gap-4 mb-6">
-                                <input type="text" value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)} placeholder="Project ID (e.g. b7ac7b87-62fc-...)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
-                                <input type="text" value={newGameName} onChange={(e) => setNewGameName(e.target.value)} placeholder="Game Name" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
-                                <button type="submit" disabled={adding || !newProjectId || !newGameName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
-                            </form>
+                            {isAuthenticated && (
+                                <form onSubmit={addProject} className="flex gap-4 mb-6">
+                                    <input type="text" value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)} placeholder="Project ID (e.g. b7ac7b87-62fc-...)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <input type="text" value={newGameName} onChange={(e) => setNewGameName(e.target.value)} placeholder="Game Name" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <button type="submit" disabled={adding || !newProjectId || !newGameName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
+                                </form>
+                            )}
                             {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>}
                             <div className="space-y-2">
                                 {loading ? <div className="text-center py-8 text-gray-500">Loading...</div> : projects.length === 0 ? <div className="text-center py-8 text-gray-500">No games mapped yet</div> : projects.map((project) => (
@@ -330,11 +340,13 @@ export default function SettingsPage() {
                             <p className="text-sm text-gray-500 mt-1">Tickets containing keywords will be auto-tagged (checks translated message)</p>
                         </div>
                         <div className="p-6">
-                            <form onSubmit={addTag} className="flex gap-4 mb-6">
-                                <input type="text" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} placeholder="Tag name (e.g. Billing)" className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
-                                <input type="text" value={newTagKeywords} onChange={(e) => setNewTagKeywords(e.target.value)} placeholder="Keywords (comma separated)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
-                                <button type="submit" disabled={addingTag || !newTagName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
-                            </form>
+                            {isAuthenticated && (
+                                <form onSubmit={addTag} className="flex gap-4 mb-6">
+                                    <input type="text" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} placeholder="Tag name (e.g. Billing)" className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <input type="text" value={newTagKeywords} onChange={(e) => setNewTagKeywords(e.target.value)} placeholder="Keywords (comma separated)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <button type="submit" disabled={addingTag || !newTagName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
+                                </form>
+                            )}
                             <div className="space-y-2">
                                 {tags.length === 0 ? <div className="text-center py-8 text-gray-500">No tags defined</div> : tags.map((tag) => (
                                     <div key={tag.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
@@ -372,11 +384,13 @@ export default function SettingsPage() {
                             <p className="text-sm text-gray-500 mt-1">Canned responses for faster support</p>
                         </div>
                         <div className="p-6">
-                            <form onSubmit={addQuickReply} className="flex gap-4 mb-6">
-                                <input type="text" value={newReplyTitle} onChange={(e) => setNewReplyTitle(e.target.value)} placeholder="Title" className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
-                                <input type="text" value={newReplyContent} onChange={(e) => setNewReplyContent(e.target.value)} placeholder="Reply content" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
-                                <button type="submit" disabled={addingReply || !newReplyTitle || !newReplyContent} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
-                            </form>
+                            {isAuthenticated && (
+                                <form onSubmit={addQuickReply} className="flex gap-4 mb-6">
+                                    <input type="text" value={newReplyTitle} onChange={(e) => setNewReplyTitle(e.target.value)} placeholder="Title" className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <input type="text" value={newReplyContent} onChange={(e) => setNewReplyContent(e.target.value)} placeholder="Reply content" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <button type="submit" disabled={addingReply || !newReplyTitle || !newReplyContent} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
+                                </form>
+                            )}
                             <div className="space-y-2">
                                 {quickReplies.length === 0 ? <div className="text-center py-8 text-gray-500">No quick replies yet</div> : quickReplies.map((reply) => (
                                     <div key={reply.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
@@ -420,15 +434,15 @@ export default function SettingsPage() {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Important Keywords</label>
                                     <p className="text-xs text-gray-500 mb-3">Tickets with these words → <span className="text-red-500 font-semibold">Important</span></p>
-                                    <textarea value={importantWords} onChange={(e) => setImportantWords(e.target.value)} placeholder="urgent, error, crash, fail, broken, bug" rows={3} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <textarea value={importantWords} onChange={(e) => setImportantWords(e.target.value)} placeholder="urgent, error, crash, fail, broken, bug" rows={3} disabled={!isAuthenticated} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Minimum Length Threshold</label>
                                     <p className="text-xs text-gray-500 mb-3">Tickets shorter than this → <span className="text-gray-500 font-semibold">Not Important</span></p>
-                                    <input type="number" value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value))} className="w-32 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <input type="number" value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value))} disabled={!isAuthenticated} className="w-32 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed" />
                                     <span className="ml-2 text-sm text-gray-500">characters</span>
                                 </div>
-                                <button type="submit" disabled={savingImportance} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">{savingImportance ? 'Saving...' : 'Save Settings'}</button>
+                                <button type="submit" disabled={savingImportance || !isAuthenticated} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">{savingImportance ? 'Saving...' : 'Save Settings'}</button>
                             </form>
                         </div>
                     </div>

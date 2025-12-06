@@ -2,11 +2,13 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 import { useParams } from 'next/navigation'
-import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle } from 'lucide-react'
+import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle, Lock } from 'lucide-react'
 
 export default function TicketDetail() {
     const { id } = useParams()
+    const { isAuthenticated } = useAuth()
     const [ticket, setTicket] = useState<any>(null)
     const [messages, setMessages] = useState<any[]>([])
     const [newMessage, setNewMessage] = useState('')
@@ -376,13 +378,20 @@ export default function TicketDetail() {
                                 </div>
                             )}
                         </div>
-                        <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            placeholder="Type your reply..."
-                            className="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                        />
+                        {!isAuthenticated ? (
+                            <div className="flex-1 flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-yellow-600 dark:text-yellow-400">
+                                <Lock className="h-4 w-4" />
+                                <span className="text-sm">Sign in to reply to tickets</span>
+                            </div>
+                        ) : (
+                            <input
+                                type="text"
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                placeholder="Type your reply..."
+                                className="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                            />
+                        )}
                         {/* Attachment Button */}
                         <input
                             type="file"
@@ -391,69 +400,73 @@ export default function TicketDetail() {
                             className="hidden"
                             accept="image/*,.pdf,.doc,.docx,.txt"
                         />
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className={`inline-flex items-center justify-center rounded-md border px-3 py-2 transition-colors ${attachment ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
-                            title={attachment ? attachment.name : 'Add Attachment'}
-                        >
-                            <Paperclip className="h-4 w-4" />
-                        </button>
+                        {isAuthenticated && (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`inline-flex items-center justify-center rounded-md border px-3 py-2 transition-colors ${attachment ? 'bg-green-50 border-green-300 text-green-700 dark:bg-green-900/20 dark:border-green-700 dark:text-green-400' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300'}`}
+                                    title={attachment ? attachment.name : 'Add Attachment'}
+                                >
+                                    <Paperclip className="h-4 w-4" />
+                                </button>
 
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (newMessage.trim()) {
-                                    setPendingMessage({ original: newMessage, translated: null, translate: false })
-                                    setShowCloseModal(true)
-                                }
-                            }}
-                            disabled={!newMessage.trim() || isTranslating}
-                            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                            title="Send"
-                        >
-                            <Send className="h-4 w-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                if (newMessage.trim() && ticket?.users?.email) {
-                                    setIsTranslating(true)
-                                    try {
-                                        const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                ticket_id: id,
-                                                message: newMessage,
-                                                user_email: ticket.users.email,
-                                                subject: ticket.subject,
-                                                language: ticket.language,
-                                                translate: true,
-                                                preview_only: true,
-                                                game_name: ticket.game_name || 'Support'
-                                            })
-                                        })
-                                        if (response.ok) {
-                                            const data = await response.json()
-                                            setPendingMessage({ original: newMessage, translated: data.message || newMessage, translate: true })
-                                        } else {
-                                            setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (newMessage.trim()) {
+                                            setPendingMessage({ original: newMessage, translated: null, translate: false })
+                                            setShowCloseModal(true)
                                         }
-                                    } catch (err) {
-                                        setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
-                                    } finally {
-                                        setIsTranslating(false)
-                                        setShowCloseModal(true)
-                                    }
-                                }
-                            }}
-                            disabled={!newMessage.trim() || isTranslating}
-                            className="inline-flex items-center justify-center rounded-md bg-purple-600 px-3 py-2 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
-                            title="Translate & Send"
-                        >
-                            <Languages className="h-4 w-4" />
-                        </button>
+                                    }}
+                                    disabled={!newMessage.trim() || isTranslating}
+                                    className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                                    title="Send"
+                                >
+                                    <Send className="h-4 w-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (newMessage.trim() && ticket?.users?.email) {
+                                            setIsTranslating(true)
+                                            try {
+                                                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
+                                                    method: 'POST',
+                                                    headers: { 'Content-Type': 'application/json' },
+                                                    body: JSON.stringify({
+                                                        ticket_id: id,
+                                                        message: newMessage,
+                                                        user_email: ticket.users.email,
+                                                        subject: ticket.subject,
+                                                        language: ticket.language,
+                                                        translate: true,
+                                                        preview_only: true,
+                                                        game_name: ticket.game_name || 'Support'
+                                                    })
+                                                })
+                                                if (response.ok) {
+                                                    const data = await response.json()
+                                                    setPendingMessage({ original: newMessage, translated: data.message || newMessage, translate: true })
+                                                } else {
+                                                    setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
+                                                }
+                                            } catch (err) {
+                                                setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
+                                            } finally {
+                                                setIsTranslating(false)
+                                                setShowCloseModal(true)
+                                            }
+                                        }
+                                    }}
+                                    disabled={!newMessage.trim() || isTranslating}
+                                    className="inline-flex items-center justify-center rounded-md bg-purple-600 px-3 py-2 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                                    title="Translate & Send"
+                                >
+                                    <Languages className="h-4 w-4" />
+                                </button>
+                            </>
+                        )}
                     </form>
 
                     {/* Attachment Preview */}

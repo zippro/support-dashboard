@@ -3,10 +3,11 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Home, Inbox, Settings, BarChart2 } from 'lucide-react'
+import { Home, Inbox, Settings, BarChart2, LogIn, LogOut, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 
 const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
@@ -18,6 +19,12 @@ const navigation = [
 export function Sidebar() {
     const pathname = usePathname()
     const [openTicketCount, setOpenTicketCount] = useState(0)
+    const { isAuthenticated, profile, signOut, isLoading } = useAuth()
+
+    // Don't show sidebar on login/register pages
+    if (pathname === '/login' || pathname === '/register') {
+        return null
+    }
 
     useEffect(() => {
         async function fetchOpenTicketCount() {
@@ -32,18 +39,15 @@ export function Sidebar() {
             }
 
             if (count !== null) {
-                console.log('Open tickets count:', count)
                 setOpenTicketCount(count)
             }
         }
 
         fetchOpenTicketCount()
 
-        // Subscribe to changes to update count in real-time
         const channel = supabase
             .channel('sidebar-ticket-count')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
-                console.log('Ticket change detected, refreshing count...')
                 fetchOpenTicketCount()
             })
             .subscribe()
@@ -98,21 +102,43 @@ export function Sidebar() {
                     )
                 })}
             </nav>
-            <div className="border-t border-gray-800 p-6 bg-black/50">
-                <div className="flex items-center group cursor-pointer">
-                    <div className="relative h-10 w-10 rounded-full overflow-hidden ring-2 ring-gray-800 group-hover:ring-indigo-500 transition-all">
-                        <Image
-                            src="/owl-avatar.png"
-                            alt="zip Agent"
-                            fill
-                            className="object-cover"
-                        />
+            <div className="border-t border-gray-800 p-4 bg-black/50">
+                {isLoading ? (
+                    <div className="flex items-center justify-center py-3">
+                        <div className="w-5 h-5 border-2 border-gray-600 border-t-indigo-500 rounded-full animate-spin" />
                     </div>
-                    <div className="ml-3">
-                        <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors">zip Agent</p>
-                        <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">View Profile</p>
+                ) : isAuthenticated && profile ? (
+                    <div className="space-y-3">
+                        <Link href="/profile" className="flex items-center group cursor-pointer hover:bg-gray-800/50 rounded-xl p-2 -m-2 transition-colors">
+                            <div className="relative h-10 w-10 rounded-full overflow-hidden ring-2 ring-gray-800 group-hover:ring-indigo-500 transition-all bg-indigo-600 flex items-center justify-center">
+                                {profile.avatar_url ? (
+                                    <Image src={profile.avatar_url} alt={profile.name} fill className="object-cover" />
+                                ) : (
+                                    <span className="text-white font-semibold text-sm">{profile.name.charAt(0).toUpperCase()}</span>
+                                )}
+                            </div>
+                            <div className="ml-3 flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors truncate">{profile.name}</p>
+                                <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors truncate">{profile.email}</p>
+                            </div>
+                        </Link>
+                        <button
+                            onClick={() => signOut()}
+                            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+                        >
+                            <LogOut className="w-4 h-4" />
+                            Sign Out
+                        </button>
                     </div>
-                </div>
+                ) : (
+                    <Link
+                        href="/login"
+                        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors"
+                    >
+                        <LogIn className="w-4 h-4" />
+                        Sign In
+                    </Link>
+                )}
             </div>
         </div>
     )
