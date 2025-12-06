@@ -319,10 +319,12 @@ export default function SettingsPage() {
                                                     <p className="font-medium text-gray-900 dark:text-white">{project.game_name}</p>
                                                     <p className="text-xs text-gray-500 font-mono">{project.project_id}</p>
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <button onClick={() => { setEditingProject(project.id); setEditGameName(project.game_name) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                                                    <button onClick={() => deleteProject(project.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                                </div>
+                                                {isAuthenticated && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button onClick={() => { setEditingProject(project.id); setEditGameName(project.game_name) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                        <button onClick={() => deleteProject(project.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </div>
@@ -363,10 +365,12 @@ export default function SettingsPage() {
                                                     <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{tag.name}</span>
                                                     <span className="text-sm text-gray-500">{tag.keywords.join(', ')}</span>
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <button onClick={() => { setEditingTag(tag.id); setEditTagName(tag.name); setEditTagKeywords(tag.keywords.join(', ')) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                                                    <button onClick={() => deleteTag(tag.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                                </div>
+                                                {isAuthenticated && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button onClick={() => { setEditingTag(tag.id); setEditTagName(tag.name); setEditTagKeywords(tag.keywords.join(', ')) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                        <button onClick={() => deleteTag(tag.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </div>
@@ -409,10 +413,12 @@ export default function SettingsPage() {
                                                     <p className="font-medium text-gray-900 dark:text-white">{reply.title}</p>
                                                     <p className="text-sm text-gray-500 truncate max-w-xl">{reply.reply}</p>
                                                 </div>
-                                                <div className="flex items-center gap-1">
-                                                    <button onClick={() => { setEditingReply(reply.id); setEditReplyTitle(reply.title); setEditReplyContent(reply.reply) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
-                                                    <button onClick={() => deleteQuickReply(reply.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
-                                                </div>
+                                                {isAuthenticated && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button onClick={() => { setEditingReply(reply.id); setEditReplyTitle(reply.title); setEditReplyContent(reply.reply) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                        <button onClick={() => deleteQuickReply(reply.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                    </div>
+                                                )}
                                             </>
                                         )}
                                     </div>

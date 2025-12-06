@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/lib/auth'
 import Link from 'next/link'
 import {
     ChevronDown,
@@ -12,7 +13,8 @@ import {
     Clock,
     Filter,
     MoreHorizontal,
-    RefreshCw
+    RefreshCw,
+    Lock
 } from 'lucide-react'
 
 // Constants
@@ -38,6 +40,8 @@ export default function TicketList() {
     const [hasMore, setHasMore] = useState(true)
     const [page, setPage] = useState(0)
     const [totalCount, setTotalCount] = useState(0)
+    const { isAuthenticated } = useAuth()
+    const [showLoginModal, setShowLoginModal] = useState(false)
 
     // Filter State
     const [statusFilter, setStatusFilter] = useState('all')
@@ -505,7 +509,7 @@ export default function TicketList() {
                     )}
 
                     {/* Bulk Actions */}
-                    {selectedTickets.size > 0 && (
+                    {isAuthenticated && selectedTickets.size > 0 && (
                         <div className="ml-auto flex items-center gap-2 animate-in fade-in slide-in-from-right-5">
                             <span className="text-sm text-gray-500">{selectedTickets.size} selected</span>
                             <select
@@ -538,12 +542,16 @@ export default function TicketList() {
                         <thead className="bg-gray-50 dark:bg-gray-950 sticky top-0 z-10">
                             <tr>
                                 <th className="px-3 py-3 text-left w-8">
-                                    <input
-                                        type="checkbox"
-                                        checked={tickets.length > 0 && selectedTickets.size === tickets.length}
-                                        onChange={handleSelectAll}
-                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                    />
+                                    {isAuthenticated ? (
+                                        <input
+                                            type="checkbox"
+                                            checked={tickets.length > 0 && selectedTickets.size === tickets.length}
+                                            onChange={handleSelectAll}
+                                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                    ) : (
+                                        <span className="text-gray-300"><Lock className="w-4 h-4" /></span>
+                                    )}
                                 </th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">Imp.</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">ID</th>
@@ -573,20 +581,24 @@ export default function TicketList() {
                                     >
                                         <td className="px-3 py-4 whitespace-nowrap w-8">
                                             <div className="flex items-center justify-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedTickets.has(ticket.id)}
-                                                    onChange={() => handleSelectTicket(ticket.id)}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 dark:border-gray-700 dark:bg-gray-900 transition-colors"
-                                                />
+                                                {isAuthenticated ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedTickets.has(ticket.id)}
+                                                        onChange={() => handleSelectTicket(ticket.id)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600 dark:border-gray-700 dark:bg-gray-900 transition-colors"
+                                                    />
+                                                ) : (
+                                                    <Lock className="w-3 h-3 text-gray-300" />
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-3 py-4 whitespace-nowrap w-8">
                                             <div
                                                 className={`w-3 h-3 rounded-full mx-auto ${ticket.importance === 'important' ? 'bg-red-500' :
-                                                        ticket.importance === 'not_important' ? 'bg-gray-200 dark:bg-gray-700' :
-                                                            'bg-gray-400'
+                                                    ticket.importance === 'not_important' ? 'bg-gray-200 dark:bg-gray-700' :
+                                                        'bg-gray-400'
                                                     }`}
                                                 title={ticket.importance === 'important' ? 'Important' : ticket.importance === 'not_important' ? 'Not Important' : 'Normal'}
                                             />
@@ -622,6 +634,10 @@ export default function TicketList() {
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation()
+                                                    if (!isAuthenticated) {
+                                                        setShowLoginModal(true)
+                                                        return
+                                                    }
                                                     toggleTicketStatus(ticket.id, ticket.status)
                                                 }}
                                                 className={`
@@ -684,6 +700,29 @@ export default function TicketList() {
                     min-width: 100%;
                 }
             `}</style>
+
+            {/* Login Required Modal */}
+            {showLoginModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowLoginModal(false)}>
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
+                        <div className="text-center">
+                            <div className="mx-auto w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-4">
+                                <Lock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Login Required</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">You need to sign in to change ticket status or perform bulk actions.</p>
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowLoginModal(false)} className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+                                    Cancel
+                                </button>
+                                <Link href="/login" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-center">
+                                    Sign In
+                                </Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

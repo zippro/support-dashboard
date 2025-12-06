@@ -103,7 +103,7 @@ export default function TicketDetail() {
     }, [messages])
 
     const toggleStatus = async () => {
-        if (!ticket) return
+        if (!ticket || !isAuthenticated) return
 
         const statusOrder = ['open', 'closed', 'pending']
         const currentIdx = statusOrder.indexOf(ticket.status)
@@ -283,13 +283,16 @@ export default function TicketDetail() {
                         <div className="flex items-center space-x-2 flex-shrink-0">
                             <button
                                 onClick={toggleStatus}
-                                className={`px-3 py-1.5 text-xs font-semibold rounded-full cursor-pointer transition-colors hover:opacity-80 flex items-center gap-1
-                  ${ticket.status === 'open' ? 'bg-green-100 text-green-800' :
+                                disabled={!isAuthenticated}
+                                title={!isAuthenticated ? 'Sign in to change status' : 'Click to change status'}
+                                className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors flex items-center gap-1
+                                    ${!isAuthenticated ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}
+                                    ${ticket.status === 'open' ? 'bg-green-100 text-green-800' :
                                         ticket.status === 'closed' ? 'bg-gray-100 text-gray-800' :
                                             'bg-yellow-100 text-yellow-800'}`}
                             >
                                 <span className="capitalize">{ticket.status}</span>
-                                <ChevronDown className="w-3 h-3" />
+                                {isAuthenticated ? <ChevronDown className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
                             </button>
                         </div>
                     </div>
