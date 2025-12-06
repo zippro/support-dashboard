@@ -19,7 +19,7 @@ const navigation = [
 export function Sidebar() {
     const pathname = usePathname()
     const [openTicketCount, setOpenTicketCount] = useState(0)
-    const { isAuthenticated, profile, signOut, isLoading } = useAuth()
+    const { isAuthenticated, profile, user, signOut, isLoading } = useAuth()
 
     useEffect(() => {
         // Skip fetching if on login/register pages
@@ -110,19 +110,19 @@ export function Sidebar() {
                     <div className="flex items-center justify-center py-3">
                         <div className="w-5 h-5 border-2 border-gray-600 border-t-indigo-500 rounded-full animate-spin" />
                     </div>
-                ) : isAuthenticated && profile ? (
+                ) : isAuthenticated ? (
                     <div className="space-y-3">
                         <Link href="/profile" className="flex items-center group cursor-pointer hover:bg-gray-800/50 rounded-xl p-2 -m-2 transition-colors">
                             <div className="relative h-10 w-10 rounded-full overflow-hidden ring-2 ring-gray-800 group-hover:ring-indigo-500 transition-all bg-indigo-600 flex items-center justify-center">
-                                {profile.avatar_url ? (
+                                {profile?.avatar_url ? (
                                     <Image src={profile.avatar_url} alt={profile.name} fill className="object-cover" />
                                 ) : (
-                                    <span className="text-white font-semibold text-sm">{profile.name.charAt(0).toUpperCase()}</span>
+                                    <span className="text-white font-semibold text-sm">{(profile?.name || profile?.email || 'U').charAt(0).toUpperCase()}</span>
                                 )}
                             </div>
                             <div className="ml-3 flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors truncate">{profile.name}</p>
-                                <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors truncate">{profile.email}</p>
+                                <p className="text-sm font-semibold text-white group-hover:text-indigo-400 transition-colors truncate">{profile?.name || 'User'}</p>
+                                <p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors truncate">{profile?.email || user?.email || ''}</p>
                             </div>
                         </Link>
                         <button
