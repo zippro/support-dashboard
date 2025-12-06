@@ -401,23 +401,6 @@ export default function TicketDetail() {
                         </button>
 
                         <button
-                            type="submit"
-                            disabled={!newMessage.trim() || isTranslating}
-                            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                            title="Send"
-                        >
-                            <Send className="h-4 w-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={(e) => sendMessage(e, false, true)}
-                            disabled={!newMessage.trim() || isTranslating}
-                            className="inline-flex items-center justify-center rounded-md bg-purple-600 px-3 py-2 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
-                            title="Translate & Send"
-                        >
-                            <Languages className="h-4 w-4" />
-                        </button>
-                        <button
                             type="button"
                             onClick={() => {
                                 if (newMessage.trim()) {
@@ -426,10 +409,24 @@ export default function TicketDetail() {
                                 }
                             }}
                             disabled={!newMessage.trim() || isTranslating}
-                            className="inline-flex items-center justify-center rounded-md border-2 border-green-600 text-green-600 dark:text-green-400 dark:border-green-500 px-4 py-2 hover:bg-green-50 dark:hover:bg-green-900/20 disabled:opacity-50 transition-colors text-sm font-medium"
+                            className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-3 py-2 text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                            title="Send"
                         >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Close Ticket
+                            <Send className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (newMessage.trim()) {
+                                    setPendingMessage({ content: newMessage, translate: true })
+                                    setShowCloseModal(true)
+                                }
+                            }}
+                            disabled={!newMessage.trim() || isTranslating}
+                            className="inline-flex items-center justify-center rounded-md bg-purple-600 px-3 py-2 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                            title="Translate & Send"
+                        >
+                            <Languages className="h-4 w-4" />
                         </button>
                     </form>
 
@@ -445,12 +442,14 @@ export default function TicketDetail() {
                     )}
                 </div>
 
-                {/* Close Confirmation Modal */}
+                {/* Send Confirmation Modal */}
                 {showCloseModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
                         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Close Ticket</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    {pendingMessage?.translate ? '🌐 Translate & Send' : '📤 Send Message'}
+                                </h3>
                                 <button
                                     onClick={() => { setShowCloseModal(false); setPendingMessage(null) }}
                                     className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -460,17 +459,22 @@ export default function TicketDetail() {
                             </div>
                             <div className="p-6">
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-full">
-                                        <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                    <div className={`p-3 rounded-full ${pendingMessage?.translate ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
+                                        {pendingMessage?.translate ? <Languages className="h-6 w-6 text-purple-600 dark:text-purple-400" /> : <Send className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />}
                                     </div>
                                     <div>
-                                        <p className="font-medium text-gray-900 dark:text-white">Send message & close ticket?</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400">This will mark ticket #{ticket.ticket_id} as resolved.</p>
+                                        <p className="font-medium text-gray-900 dark:text-white">
+                                            {pendingMessage?.translate ? 'Translate and send this message?' : 'Send this message?'}
+                                        </p>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400">To: {ticket.users?.email}</p>
                                     </div>
                                 </div>
                                 <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
                                     <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{pendingMessage?.content}</p>
                                 </div>
+                                {pendingMessage?.translate && (
+                                    <p className="text-xs text-purple-600 dark:text-purple-400 italic">Message will be translated to {ticket.language || 'user language'}</p>
+                                )}
                             </div>
                             <div className="flex gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-800">
                                 <button
@@ -483,7 +487,20 @@ export default function TicketDetail() {
                                     onClick={async (e) => {
                                         if (pendingMessage) {
                                             setShowCloseModal(false)
-                                            await sendMessage(e as any, true, false)
+                                            await sendMessage(e as any, false, pendingMessage.translate)
+                                            setPendingMessage(null)
+                                        }
+                                    }}
+                                    className={`flex-1 px-4 py-2.5 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 ${pendingMessage?.translate ? 'bg-purple-600 hover:bg-purple-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                                >
+                                    {pendingMessage?.translate ? <Languages className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+                                    Send
+                                </button>
+                                <button
+                                    onClick={async (e) => {
+                                        if (pendingMessage) {
+                                            setShowCloseModal(false)
+                                            await sendMessage(e as any, true, pendingMessage.translate)
                                             setPendingMessage(null)
                                         }
                                     }}
