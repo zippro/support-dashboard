@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Trash2, Plus, Gamepad2, Tag, Zap, Settings, MessageSquare } from 'lucide-react'
+import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check } from 'lucide-react'
 
 interface Project {
     id: string
@@ -32,6 +32,9 @@ export default function SettingsPage() {
     const [newReplyTitle, setNewReplyTitle] = useState('')
     const [newReplyContent, setNewReplyContent] = useState('')
     const [addingReply, setAddingReply] = useState(false)
+    const [editingReply, setEditingReply] = useState<string | null>(null)
+    const [editReplyTitle, setEditReplyTitle] = useState('')
+    const [editReplyContent, setEditReplyContent] = useState('')
 
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
@@ -39,11 +42,16 @@ export default function SettingsPage() {
     const [newGameName, setNewGameName] = useState('')
     const [adding, setAdding] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [editingProject, setEditingProject] = useState<string | null>(null)
+    const [editGameName, setEditGameName] = useState('')
 
     const [tags, setTags] = useState<TagDefinition[]>([])
     const [newTagName, setNewTagName] = useState('')
     const [newTagKeywords, setNewTagKeywords] = useState('')
     const [addingTag, setAddingTag] = useState(false)
+    const [editingTag, setEditingTag] = useState<string | null>(null)
+    const [editTagName, setEditTagName] = useState('')
+    const [editTagKeywords, setEditTagKeywords] = useState('')
 
     const [importanceSettings, setImportanceSettings] = useState<ImportanceSettings | null>(null)
     const [importantWords, setImportantWords] = useState('')
@@ -87,11 +95,7 @@ export default function SettingsPage() {
         try {
             setAddingTag(true)
             const keywordsArray = newTagKeywords.split(',').map(k => k.trim()).filter(k => k)
-            const { data, error } = await supabase
-                .from('tag_definitions')
-                .insert({ name: newTagName.trim(), keywords: keywordsArray })
-                .select()
-                .single()
+            const { data, error } = await supabase.from('tag_definitions').insert({ name: newTagName.trim(), keywords: keywordsArray }).select().single()
             if (error) throw error
             setTags([data, ...tags])
             setNewTagName('')
@@ -100,6 +104,18 @@ export default function SettingsPage() {
             alert('Error adding tag: ' + err.message)
         } finally {
             setAddingTag(false)
+        }
+    }
+
+    async function updateTag(id: string) {
+        try {
+            const keywordsArray = editTagKeywords.split(',').map(k => k.trim()).filter(k => k)
+            const { error } = await supabase.from('tag_definitions').update({ name: editTagName.trim(), keywords: keywordsArray }).eq('id', id)
+            if (error) throw error
+            setTags(tags.map(t => t.id === id ? { ...t, name: editTagName.trim(), keywords: keywordsArray } : t))
+            setEditingTag(null)
+        } catch (err: any) {
+            alert('Error updating tag: ' + err.message)
         }
     }
 
@@ -163,6 +179,17 @@ export default function SettingsPage() {
         }
     }
 
+    async function updateQuickReply(id: string) {
+        try {
+            const { error } = await supabase.from('quick_replies').update({ title: editReplyTitle.trim(), reply: editReplyContent.trim() }).eq('id', id)
+            if (error) throw error
+            setQuickReplies(quickReplies.map(r => r.id === id ? { ...r, title: editReplyTitle.trim(), reply: editReplyContent.trim() } : r))
+            setEditingReply(null)
+        } catch (err: any) {
+            alert('Failed to update reply: ' + err.message)
+        }
+    }
+
     async function deleteQuickReply(id: string) {
         if (!confirm('Delete this reply?')) return
         try {
@@ -205,6 +232,17 @@ export default function SettingsPage() {
         }
     }
 
+    async function updateProject(id: string) {
+        try {
+            const { error } = await supabase.from('projects').update({ game_name: editGameName.trim() }).eq('id', id)
+            if (error) throw error
+            setProjects(projects.map(p => p.id === id ? { ...p, game_name: editGameName.trim() } : p))
+            setEditingProject(null)
+        } catch (err: any) {
+            alert('Failed to update: ' + err.message)
+        }
+    }
+
     async function deleteProject(id: string) {
         if (!confirm('Delete this mapping?')) return
         try {
@@ -234,22 +272,10 @@ export default function SettingsPage() {
                 {/* Tab Navigation */}
                 <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
                     {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id
-                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
-                                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800'
-                                }`}
-                        >
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800'}`}>
                             <tab.icon className="w-4 h-4" />
                             {tab.label}
-                            {tab.count !== null && (
-                                <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 dark:bg-gray-800'
-                                    }`}>
-                                    {tab.count}
-                                </span>
-                            )}
+                            {tab.count !== null && <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 dark:bg-gray-800'}`}>{tab.count}</span>}
                         </button>
                     ))}
                 </div>
@@ -263,43 +289,34 @@ export default function SettingsPage() {
                         </div>
                         <div className="p-6">
                             <form onSubmit={addProject} className="flex gap-4 mb-6">
-                                <input
-                                    type="text"
-                                    value={newProjectId}
-                                    onChange={(e) => setNewProjectId(e.target.value)}
-                                    placeholder="Project ID (e.g. b7ac7b87-62fc-...)"
-                                    className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                />
-                                <input
-                                    type="text"
-                                    value={newGameName}
-                                    onChange={(e) => setNewGameName(e.target.value)}
-                                    placeholder="Game Name"
-                                    className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                />
-                                <button type="submit" disabled={adding || !newProjectId || !newGameName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                    <Plus className="w-4 h-4" /> Add
-                                </button>
+                                <input type="text" value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)} placeholder="Project ID (e.g. b7ac7b87-62fc-...)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                <input type="text" value={newGameName} onChange={(e) => setNewGameName(e.target.value)} placeholder="Game Name" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                <button type="submit" disabled={adding || !newProjectId || !newGameName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
                             </form>
                             {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>}
                             <div className="space-y-2">
-                                {loading ? (
-                                    <div className="text-center py-8 text-gray-500">Loading...</div>
-                                ) : projects.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-500">No games mapped yet</div>
-                                ) : (
-                                    projects.map((project) => (
-                                        <div key={project.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                                            <div>
-                                                <p className="font-medium text-gray-900 dark:text-white">{project.game_name}</p>
-                                                <p className="text-xs text-gray-500 font-mono">{project.project_id}</p>
+                                {loading ? <div className="text-center py-8 text-gray-500">Loading...</div> : projects.length === 0 ? <div className="text-center py-8 text-gray-500">No games mapped yet</div> : projects.map((project) => (
+                                    <div key={project.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        {editingProject === project.id ? (
+                                            <div className="flex items-center gap-3 flex-1">
+                                                <input type="text" value={editGameName} onChange={(e) => setEditGameName(e.target.value)} className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                                <button onClick={() => updateProject(project.id)} className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"><Check className="w-4 h-4" /></button>
+                                                <button onClick={() => setEditingProject(null)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X className="w-4 h-4" /></button>
                                             </div>
-                                            <button onClick={() => deleteProject(project.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))
-                                )}
+                                        ) : (
+                                            <>
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{project.game_name}</p>
+                                                    <p className="text-xs text-gray-500 font-mono">{project.project_id}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={() => { setEditingProject(project.id); setEditGameName(project.game_name) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                    <button onClick={() => deleteProject(project.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -310,44 +327,38 @@ export default function SettingsPage() {
                     <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800">
                         <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Auto-Tags</h2>
-                            <p className="text-sm text-gray-500 mt-1">Tickets containing keywords will be auto-tagged</p>
+                            <p className="text-sm text-gray-500 mt-1">Tickets containing keywords will be auto-tagged (checks translated message)</p>
                         </div>
                         <div className="p-6">
                             <form onSubmit={addTag} className="flex gap-4 mb-6">
-                                <input
-                                    type="text"
-                                    value={newTagName}
-                                    onChange={(e) => setNewTagName(e.target.value)}
-                                    placeholder="Tag name (e.g. Billing)"
-                                    className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                />
-                                <input
-                                    type="text"
-                                    value={newTagKeywords}
-                                    onChange={(e) => setNewTagKeywords(e.target.value)}
-                                    placeholder="Keywords (comma separated)"
-                                    className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                />
-                                <button type="submit" disabled={addingTag || !newTagName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                    <Plus className="w-4 h-4" /> Add
-                                </button>
+                                <input type="text" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} placeholder="Tag name (e.g. Billing)" className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                <input type="text" value={newTagKeywords} onChange={(e) => setNewTagKeywords(e.target.value)} placeholder="Keywords (comma separated)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                <button type="submit" disabled={addingTag || !newTagName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
                             </form>
                             <div className="space-y-2">
-                                {tags.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-500">No tags defined</div>
-                                ) : (
-                                    tags.map((tag) => (
-                                        <div key={tag.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                                            <div className="flex items-center gap-3">
-                                                <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{tag.name}</span>
-                                                <span className="text-sm text-gray-500">{tag.keywords.join(', ')}</span>
+                                {tags.length === 0 ? <div className="text-center py-8 text-gray-500">No tags defined</div> : tags.map((tag) => (
+                                    <div key={tag.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        {editingTag === tag.id ? (
+                                            <div className="flex items-center gap-3 flex-1">
+                                                <input type="text" value={editTagName} onChange={(e) => setEditTagName(e.target.value)} placeholder="Tag name" className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                                <input type="text" value={editTagKeywords} onChange={(e) => setEditTagKeywords(e.target.value)} placeholder="Keywords" className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                                <button onClick={() => updateTag(tag.id)} className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"><Check className="w-4 h-4" /></button>
+                                                <button onClick={() => setEditingTag(null)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X className="w-4 h-4" /></button>
                                             </div>
-                                            <button onClick={() => deleteTag(tag.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))
-                                )}
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{tag.name}</span>
+                                                    <span className="text-sm text-gray-500">{tag.keywords.join(', ')}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={() => { setEditingTag(tag.id); setEditTagName(tag.name); setEditTagKeywords(tag.keywords.join(', ')) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                    <button onClick={() => deleteTag(tag.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -362,40 +373,36 @@ export default function SettingsPage() {
                         </div>
                         <div className="p-6">
                             <form onSubmit={addQuickReply} className="flex gap-4 mb-6">
-                                <input
-                                    type="text"
-                                    value={newReplyTitle}
-                                    onChange={(e) => setNewReplyTitle(e.target.value)}
-                                    placeholder="Title"
-                                    className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                />
-                                <input
-                                    type="text"
-                                    value={newReplyContent}
-                                    onChange={(e) => setNewReplyContent(e.target.value)}
-                                    placeholder="Reply content"
-                                    className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                />
-                                <button type="submit" disabled={addingReply || !newReplyTitle || !newReplyContent} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                    <Plus className="w-4 h-4" /> Add
-                                </button>
+                                <input type="text" value={newReplyTitle} onChange={(e) => setNewReplyTitle(e.target.value)} placeholder="Title" className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                <input type="text" value={newReplyContent} onChange={(e) => setNewReplyContent(e.target.value)} placeholder="Reply content" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                <button type="submit" disabled={addingReply || !newReplyTitle || !newReplyContent} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
                             </form>
                             <div className="space-y-2">
-                                {quickReplies.length === 0 ? (
-                                    <div className="text-center py-8 text-gray-500">No quick replies yet</div>
-                                ) : (
-                                    quickReplies.map((reply) => (
-                                        <div key={reply.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                                            <div>
-                                                <p className="font-medium text-gray-900 dark:text-white">{reply.title}</p>
-                                                <p className="text-sm text-gray-500 truncate max-w-xl">{reply.reply}</p>
+                                {quickReplies.length === 0 ? <div className="text-center py-8 text-gray-500">No quick replies yet</div> : quickReplies.map((reply) => (
+                                    <div key={reply.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        {editingReply === reply.id ? (
+                                            <div className="flex flex-col gap-2 flex-1 mr-4">
+                                                <input type="text" value={editReplyTitle} onChange={(e) => setEditReplyTitle(e.target.value)} placeholder="Title" className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                                <textarea value={editReplyContent} onChange={(e) => setEditReplyContent(e.target.value)} placeholder="Reply content" rows={2} className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                                <div className="flex gap-2 mt-1">
+                                                    <button onClick={() => updateQuickReply(reply.id)} className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Save</button>
+                                                    <button onClick={() => setEditingReply(null)} className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">Cancel</button>
+                                                </div>
                                             </div>
-                                            <button onClick={() => deleteQuickReply(reply.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors">
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    ))
-                                )}
+                                        ) : (
+                                            <>
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{reply.title}</p>
+                                                    <p className="text-sm text-gray-500 truncate max-w-xl">{reply.reply}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={() => { setEditingReply(reply.id); setEditReplyTitle(reply.title); setEditReplyContent(reply.reply) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                    <button onClick={() => deleteQuickReply(reply.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -406,39 +413,22 @@ export default function SettingsPage() {
                     <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800">
                         <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI & Importance Rules</h2>
-                            <p className="text-sm text-gray-500 mt-1">Configure automatic importance detection</p>
+                            <p className="text-sm text-gray-500 mt-1">Configure automatic importance detection (checks original message)</p>
                         </div>
                         <div className="p-6">
                             <form onSubmit={saveImportanceSettings} className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Important Keywords
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Important Keywords</label>
                                     <p className="text-xs text-gray-500 mb-3">Tickets with these words → <span className="text-red-500 font-semibold">Important</span></p>
-                                    <textarea
-                                        value={importantWords}
-                                        onChange={(e) => setImportantWords(e.target.value)}
-                                        placeholder="urgent, error, crash, fail, broken, bug"
-                                        rows={3}
-                                        className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                    />
+                                    <textarea value={importantWords} onChange={(e) => setImportantWords(e.target.value)} placeholder="urgent, error, crash, fail, broken, bug" rows={3} className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                        Minimum Length Threshold
-                                    </label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Minimum Length Threshold</label>
                                     <p className="text-xs text-gray-500 mb-3">Tickets shorter than this → <span className="text-gray-500 font-semibold">Not Important</span></p>
-                                    <input
-                                        type="number"
-                                        value={threshold}
-                                        onChange={(e) => setThreshold(parseInt(e.target.value))}
-                                        className="w-32 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
-                                    />
+                                    <input type="number" value={threshold} onChange={(e) => setThreshold(parseInt(e.target.value))} className="w-32 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                                     <span className="ml-2 text-sm text-gray-500">characters</span>
                                 </div>
-                                <button type="submit" disabled={savingImportance} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                    {savingImportance ? 'Saving...' : 'Save Settings'}
-                                </button>
+                                <button type="submit" disabled={savingImportance} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">{savingImportance ? 'Saving...' : 'Save Settings'}</button>
                             </form>
                         </div>
                     </div>

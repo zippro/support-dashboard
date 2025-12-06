@@ -150,8 +150,8 @@ export default function Dashboard() {
     <div className="p-8 space-y-6 h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Analytics Dashboard</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Support performance & insights</p>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Support performance overview</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-md border dark:border-gray-800 shadow-sm">
           <Clock className="w-4 h-4" /><span>{new Date().toLocaleTimeString()}</span>
@@ -160,7 +160,7 @@ export default function Dashboard() {
 
       {/* AI Insights */}
       <div className="rounded-xl border bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-4 dark:border-gray-800">
-        <div className="flex items-center gap-2 mb-3"><Sparkles className="w-5 h-5 text-indigo-500" /><h3 className="font-semibold text-gray-900 dark:text-white">AI Insights</h3></div>
+        <div className="flex items-center gap-2 mb-3"><Sparkles className="w-5 h-5 text-indigo-500" /><h3 className="font-semibold text-gray-900 dark:text-white">Insights</h3></div>
         <div className="flex flex-wrap gap-3">
           {insights.map((insight, i) => (<div key={i} className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-lg border dark:border-gray-800 shadow-sm"><insight.icon className={`w-4 h-4 ${insight.color}`} /><span className="text-sm text-gray-700 dark:text-gray-300">{insight.message}</span></div>))}
         </div>
