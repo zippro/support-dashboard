@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
-import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send } from 'lucide-react'
+import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send, FileText, Calendar } from 'lucide-react'
 
 interface Project {
     id: string
@@ -33,7 +33,16 @@ interface AlertSetting {
     webhook_url: string
 }
 
-type TabType = 'games' | 'tags' | 'replies' | 'ai' | 'alerts'
+interface ReportSetting {
+    id: string
+    key: string
+    enabled: boolean
+    webhook_url: string
+    schedule_hour: number
+    timezone: string
+}
+
+type TabType = 'games' | 'tags' | 'replies' | 'ai' | 'alerts' | 'reports'
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabType>('games')
@@ -75,12 +84,17 @@ export default function SettingsPage() {
     const [testingAlert, setTestingAlert] = useState(false)
     const [checkingAlerts, setCheckingAlerts] = useState(false)
 
+    // Report state
+    const [reportSettings, setReportSettings] = useState<ReportSetting[]>([])
+    const [sendingReport, setSendingReport] = useState(false)
+
     useEffect(() => {
         fetchProjects()
         fetchQuickReplies()
         fetchTags()
         fetchImportanceSettings()
         fetchAlertSettings()
+        fetchReportSettings()
     }, [])
 
     async function fetchTags() {
@@ -251,6 +265,112 @@ export default function SettingsPage() {
             console.error('Error checking alerts:', err)
         } finally {
             setCheckingAlerts(false)
+        }
+    }
+
+    async function fetchReportSettings() {
+        try {
+            const { data, error } = await supabase.from('report_settings').select('*')
+            if (error) throw error
+            setReportSettings(data || [])
+        } catch (err) {
+            console.error('Error fetching report settings:', err)
+        }
+    }
+
+    async function updateReportSetting(key: string, updates: Partial<ReportSetting>) {
+        try {
+            const { error } = await supabase.from('report_settings').update(updates).eq('key', key)
+            if (error) throw error
+            setReportSettings(prev => prev.map(s => s.key === key ? { ...s, ...updates } : s))
+        } catch (err) {
+            console.error('Error updating report setting:', err)
+        }
+    }
+
+    async function sendDailyReport() {
+        setSendingReport(true)
+        try {
+            const setting = reportSettings.find(s => s.key === 'daily_report')
+            if (!setting?.webhook_url) return
+
+            // Check if today is Monday (for weekend report)
+            const now = new Date()
+            const isMonday = now.getDay() === 1
+            const hoursBack = isMonday ? 62 : 24 // 62 hours for weekend (Fri 6PM to Mon 8AM)
+
+            const startTime = new Date(now.getTime() - hoursBack * 60 * 60 * 1000)
+            const previousStart = new Date(startTime.getTime() - hoursBack * 60 * 60 * 1000)
+
+            // Fetch current period tickets
+            const { data: currentTickets } = await supabase
+                .from('tickets')
+                .select('id, game_name, project_id, importance, status, original_summary, subject, created_at')
+                .gte('created_at', startTime.toISOString())
+
+            // Fetch previous period tickets
+            const { data: previousTickets } = await supabase
+                .from('tickets')
+                .select('id')
+                .gte('created_at', previousStart.toISOString())
+                .lt('created_at', startTime.toISOString())
+
+            const currentCount = currentTickets?.length || 0
+            const previousCount = previousTickets?.length || 0
+            const percentChange = previousCount > 0 ? Math.round(((currentCount - previousCount) / previousCount) * 100) : 0
+            const changeText = percentChange >= 0 ? `+${percentChange}% more` : `${percentChange}% less`
+
+            // Count by game
+            const gameCount: Record<string, number> = {}
+            currentTickets?.forEach(t => {
+                const game = t.game_name || 'Unknown'
+                gameCount[game] = (gameCount[game] || 0) + 1
+            })
+            const topGames = Object.entries(gameCount)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([name, count]) => `• ${name}: ${count} tickets`)
+
+            // Important messages
+            const importantTickets = currentTickets?.filter(t => t.importance === 'important') || []
+            const importantList = importantTickets
+                .slice(0, 5)
+                .map(t => `• ${t.game_name || 'Unknown'}: "${(t.original_summary || t.subject || '').slice(0, 50)}..."`)
+
+            // Counts
+            const openCount = currentTickets?.filter(t => t.status === 'open').length || 0
+            const closedCount = currentTickets?.filter(t => t.status === 'closed').length || 0
+            const importantCount = importantTickets.length
+
+            // Build message
+            const reportTitle = isMonday ? '📊 **Weekend Report**' : '📊 **Daily Report**'
+            const periodText = isMonday ? 'Last 62 hours (Weekend)' : 'Last 24 hours'
+
+            const message = `${reportTitle}
+${periodText}
+
+📥 **Received ${currentCount} tickets** (${changeText} than previous period)
+
+🎮 **Top Games**
+${topGames.length > 0 ? topGames.join('\n') : '• No tickets received'}
+
+🚨 **Important Messages** (${importantCount})
+${importantList.length > 0 ? importantList.join('\n') : '• None flagged as important'}
+
+📈 **Summary**
+Open: ${openCount} | Closed: ${closedCount} | Important: ${importantCount}
+
+_Report generated at ${now.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}_`
+
+            await fetch(setting.webhook_url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: message })
+            })
+        } catch (err) {
+            console.error('Error sending daily report:', err)
+        } finally {
+            setSendingReport(false)
         }
     }
 
@@ -425,6 +545,7 @@ export default function SettingsPage() {
         { id: 'replies' as TabType, label: 'Quick Replies', icon: MessageSquare, count: quickReplies.length },
         { id: 'ai' as TabType, label: 'AI Settings', icon: Settings, count: null },
         { id: 'alerts' as TabType, label: 'Alerts', icon: Bell, count: alertSettings.filter(s => s.enabled).length },
+        { id: 'reports' as TabType, label: 'Reports', icon: FileText, count: reportSettings.filter(s => s.enabled).length },
     ]
 
     return (
@@ -793,6 +914,74 @@ export default function SettingsPage() {
                                         {checkingAlerts ? 'Checking...' : 'Check Alerts Now'}
                                     </button>
                                 </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Reports Tab */}
+                {activeTab === 'reports' && (
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800">
+                            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Daily Reports</h2>
+                                <p className="text-sm text-gray-500 mt-1">Automated reports sent to Discord every day at 8 AM Turkish time</p>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                {/* Daily Report Setting */}
+                                {reportSettings.find(s => s.key === 'daily_report') && (
+                                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                                                <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium text-gray-900 dark:text-white">Daily Report</h3>
+                                                <p className="text-sm text-gray-500 mt-1">Summary of tickets from last 24 hours (62 hours on Mondays for weekend)</p>
+                                                <div className="mt-3 text-xs text-gray-400 space-y-1">
+                                                    <p>📥 Total tickets received with % change</p>
+                                                    <p>🎮 Top 3 games by ticket count</p>
+                                                    <p>🚨 Important messages list</p>
+                                                    <p>📈 Open/Closed/Important summary</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateReportSetting('daily_report', { enabled: !reportSettings.find(s => s.key === 'daily_report')?.enabled })}
+                                            disabled={!isAuthenticated}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${reportSettings.find(s => s.key === 'daily_report')?.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${reportSettings.find(s => s.key === 'daily_report')?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {reportSettings.length === 0 && (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <FileText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                        <p>No report settings found. Run the database migration first.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        {isAuthenticated && reportSettings.length > 0 && (
+                            <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+                                <h3 className="font-medium text-gray-900 dark:text-white mb-4">Actions</h3>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={sendDailyReport}
+                                        disabled={sendingReport}
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                                    >
+                                        <Send className="w-4 h-4" />
+                                        {sendingReport ? 'Sending...' : 'Send Report Now'}
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-3">
+                                    Reports are automatically sent daily at 8:00 AM Turkish time (Europe/Istanbul)
+                                </p>
                             </div>
                         )}
                     </div>
