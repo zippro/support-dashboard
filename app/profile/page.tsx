@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/lib/auth'
 import { supabase } from '@/lib/supabase'
-import { User, Mail, Camera, Lock, Save, Loader2 } from 'lucide-react'
+import { User, Mail, Camera, Lock, Save, Loader2, UserPlus } from 'lucide-react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 
@@ -12,16 +12,23 @@ export default function ProfilePage() {
     const router = useRouter()
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    const [name, setName] = useState(profile?.name || '')
+    const [name, setName] = useState('')
     const [saving, setSaving] = useState(false)
     const [uploadingAvatar, setUploadingAvatar] = useState(false)
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+    const [creatingProfile, setCreatingProfile] = useState(false)
 
     // Password change
-    const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
     const [changingPassword, setChangingPassword] = useState(false)
+
+    // Update name when profile loads
+    useEffect(() => {
+        if (profile?.name) {
+            setName(profile.name)
+        }
+    }, [profile])
 
     // Redirect if not authenticated
     if (!isLoading && !isAuthenticated) {
@@ -29,12 +36,34 @@ export default function ProfilePage() {
         return null
     }
 
-    if (isLoading || !profile) {
+    if (isLoading) {
         return (
             <div className="h-full flex items-center justify-center bg-gray-950">
                 <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" />
             </div>
         )
+    }
+
+    // Create profile if it doesn't exist
+    async function handleCreateProfile(e: React.FormEvent) {
+        e.preventDefault()
+        if (!user || !name.trim()) return
+
+        setCreatingProfile(true)
+        setMessage(null)
+
+        const { error } = await supabase
+            .from('agent_profiles')
+            .insert({ id: user.id, name: name.trim(), email: user.email })
+
+        if (error) {
+            setMessage({ type: 'error', text: error.message })
+        } else {
+            setMessage({ type: 'success', text: 'Profile created! Refreshing...' })
+            // Reload to fetch new profile
+            window.location.reload()
+        }
+        setCreatingProfile(false)
     }
 
     async function handleSaveProfile(e: React.FormEvent) {
@@ -111,11 +140,70 @@ export default function ProfilePage() {
             setMessage({ type: 'error', text: error.message })
         } else {
             setMessage({ type: 'success', text: 'Password changed successfully!' })
-            setCurrentPassword('')
             setNewPassword('')
             setConfirmPassword('')
         }
         setChangingPassword(false)
+    }
+
+    // Show profile creation form if no profile exists
+    if (!profile) {
+        return (
+            <div className="h-full overflow-y-auto bg-gray-950 p-8">
+                <div className="max-w-md mx-auto space-y-8">
+                    <div className="text-center">
+                        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-indigo-600/20 mb-4">
+                            <UserPlus className="w-10 h-10 text-indigo-500" />
+                        </div>
+                        <h1 className="text-3xl font-bold text-white">Complete Your Profile</h1>
+                        <p className="text-gray-400 mt-2">Set up your profile to get started</p>
+                    </div>
+
+                    {message && (
+                        <div className={`p-4 rounded-xl ${message.type === 'success' ? 'bg-green-500/10 border border-green-500/20 text-green-400' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                            {message.text}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleCreateProfile} className="bg-gray-900 rounded-2xl border border-gray-800 p-6 space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Your Name</label>
+                            <div className="relative">
+                                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    placeholder="Enter your name"
+                                    required
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                            <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                                <input
+                                    type="email"
+                                    value={user?.email || ''}
+                                    disabled
+                                    className="w-full pl-11 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-gray-400 cursor-not-allowed"
+                                />
+                            </div>
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={creatingProfile || !name.trim()}
+                            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition-colors disabled:opacity-50"
+                        >
+                            {creatingProfile ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+                            Create Profile
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -255,3 +343,4 @@ export default function ProfilePage() {
         </div>
     )
 }
+
