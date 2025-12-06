@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Activity, MessageSquare, Users, Clock, CheckCircle, AlertCircle, Inbox, TrendingUp, TrendingDown, Minus, Smile, Meh, Frown, Angry, Tag, AlertTriangle } from 'lucide-react'
+import { Clock, CheckCircle, AlertCircle, Inbox, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -10,13 +10,10 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
   AreaChart,
   Area
 } from 'recharts'
@@ -59,9 +56,10 @@ export default function Dashboard() {
   })
   const [gameStats, setGameStats] = useState<any[]>([])
   const [timelineData, setTimelineData] = useState<any[]>([])
-  const [sentimentData, setSentimentData] = useState<any[]>([])
+  const [todaySentiment, setTodaySentiment] = useState<any[]>([])
   const [comparisonData, setComparisonData] = useState<any[]>([])
   const [topTags, setTopTags] = useState<any[]>([])
+  const [insights, setInsights] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -101,7 +99,7 @@ export default function Dashboard() {
 
         setStats({ total, open, closed, pending, totalTrend, openTrend, important })
 
-        // 3. Comparison Data (Today vs Yesterday)
+        // 3. Comparison Data
         setComparisonData([
           { name: 'Total', yesterday: yesterdayTickets.length, today: todayTickets.length },
           { name: 'Open', yesterday: yesterdayTickets.filter(t => t.status === 'open').length, today: todayTickets.filter(t => t.status === 'open').length },
@@ -109,54 +107,42 @@ export default function Dashboard() {
           { name: 'Important', yesterday: yesterdayTickets.filter(t => t.importance === 'important').length, today: todayTickets.filter(t => t.importance === 'important').length },
         ])
 
-        // 4. Sentiment Distribution
-        const sentimentCounts: Record<string, number> = { Positive: 0, Neutral: 0, Negative: 0, Angry: 0 }
-        tickets.forEach(t => {
+        // 4. Today's Sentiment (only today)
+        const todaySentimentCounts: Record<string, number> = { Positive: 0, Neutral: 0, Negative: 0, Angry: 0 }
+        todayTickets.forEach(t => {
           const s = t.sentiment || 'Neutral'
-          if (sentimentCounts[s] !== undefined) sentimentCounts[s]++
-          else sentimentCounts['Neutral']++
+          if (todaySentimentCounts[s] !== undefined) todaySentimentCounts[s]++
+          else todaySentimentCounts['Neutral']++
         })
-        setSentimentData(Object.entries(sentimentCounts).map(([name, value]) => ({ name, value })))
+        setTodaySentiment(Object.entries(todaySentimentCounts).map(([name, value]) => ({ name, value })))
 
         // 5. Top Tags
         const tagCounts: Record<string, number> = {}
         tickets.forEach(t => {
           const tags = t.tags || []
-          tags.forEach((tag: string) => {
-            tagCounts[tag] = (tagCounts[tag] || 0) + 1
-          })
+          tags.forEach((tag: string) => { tagCounts[tag] = (tagCounts[tag] || 0) + 1 })
         })
-        const sortedTags = Object.entries(tagCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([name, value]) => ({ name, value }))
-        setTopTags(sortedTags)
+        setTopTags(Object.entries(tagCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value })))
 
         // 6. Game Stats
         const projectCounts: Record<string, number> = {}
-        tickets.forEach(t => {
-          const pid = t.project_id || 'Unknown'
-          projectCounts[pid] = (projectCounts[pid] || 0) + 1
-        })
+        tickets.forEach(t => { projectCounts[t.project_id || 'Unknown'] = (projectCounts[t.project_id || 'Unknown'] || 0) + 1 })
 
         const { data: projects } = await supabase.from('projects').select('project_id, game_name')
         const projectMap: Record<string, string> = {}
         projects?.forEach(p => projectMap[p.project_id] = p.game_name)
 
-        const chartData = Object.entries(projectCounts).map(([pid, count]) => ({
-          name: projectMap[pid] || pid.slice(0, 8) + '...',
+        setGameStats(Object.entries(projectCounts).map(([pid, count]) => ({
+          name: projectMap[pid] || 'Unknown',
           value: count
-        })).sort((a, b) => b.value - a.value).slice(0, 5)
-        setGameStats(chartData)
+        })).sort((a, b) => b.value - a.value).slice(0, 5))
 
-        // 7. Timeline Data (Last 7 Days)
+        // 7. Timeline (Last 7 Days)
         const daysMap: Record<string, number> = {}
         for (let i = 6; i >= 0; i--) {
           const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-          const key = d.toLocaleDateString('en-US', { weekday: 'short' })
-          daysMap[key] = 0
+          daysMap[d.toLocaleDateString('en-US', { weekday: 'short' })] = 0
         }
-
         tickets.forEach(t => {
           const d = new Date(t.created_at)
           if (d >= lastWeek) {
@@ -164,19 +150,37 @@ export default function Dashboard() {
             if (daysMap[key] !== undefined) daysMap[key]++
           }
         })
-
         setTimelineData(Object.entries(daysMap).map(([date, count]) => ({ date, tickets: count })))
+
+        // 8. AI Insights
+        const newInsights: any[] = []
+
+        // Volume change alert
+        if (totalTrend > 50) newInsights.push({ type: 'warning', icon: ArrowUp, message: `Ticket volume up ${totalTrend}% today`, color: 'text-orange-500' })
+        else if (totalTrend < -30) newInsights.push({ type: 'success', icon: ArrowDown, message: `Ticket volume down ${Math.abs(totalTrend)}% today`, color: 'text-green-500' })
+
+        // Angry sentiment alert
+        const angryToday = todayTickets.filter(t => t.sentiment === 'Angry').length
+        if (angryToday > 0) newInsights.push({ type: 'alert', icon: AlertTriangle, message: `${angryToday} angry customer${angryToday > 1 ? 's' : ''} today - needs attention!`, color: 'text-red-500' })
+
+        // Important tickets
+        const importantOpen = tickets.filter(t => t.importance === 'important' && t.status === 'open').length
+        if (importantOpen > 0) newInsights.push({ type: 'alert', icon: AlertCircle, message: `${importantOpen} important ticket${importantOpen > 1 ? 's' : ''} still open`, color: 'text-red-500' })
+
+        // Resolution rate
+        const resolutionRate = total > 0 ? Math.round((closed / total) * 100) : 0
+        if (resolutionRate > 80) newInsights.push({ type: 'success', icon: CheckCircle, message: `Great job! ${resolutionRate}% resolution rate`, color: 'text-green-500' })
+        else if (resolutionRate < 50) newInsights.push({ type: 'warning', icon: AlertTriangle, message: `Resolution rate at ${resolutionRate}% - needs improvement`, color: 'text-orange-500' })
+
+        if (newInsights.length === 0) newInsights.push({ type: 'info', icon: CheckCircle, message: 'No alerts - everything looks good!', color: 'text-green-500' })
+
+        setInsights(newInsights)
       }
       setLoading(false)
     }
 
     fetchStats()
-
-    const channel = supabase
-      .channel('dashboard-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchStats())
-      .subscribe()
-
+    const channel = supabase.channel('dashboard-stats').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchStats()).subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
 
@@ -189,7 +193,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-8 space-y-8 h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
+    <div className="p-8 space-y-6 h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Analytics Dashboard</h1>
@@ -197,11 +201,27 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-md border dark:border-gray-800 shadow-sm">
           <Clock className="w-4 h-4" />
-          <span>Updated: {new Date().toLocaleTimeString()}</span>
+          <span>{new Date().toLocaleTimeString()}</span>
         </div>
       </div>
 
-      {/* Stats Grid - Row 1 */}
+      {/* AI Insights */}
+      <div className="rounded-xl border bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-4 dark:border-gray-800">
+        <div className="flex items-center gap-2 mb-3">
+          <Sparkles className="w-5 h-5 text-indigo-500" />
+          <h3 className="font-semibold text-gray-900 dark:text-white">AI Insights</h3>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          {insights.map((insight, i) => (
+            <div key={i} className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-lg border dark:border-gray-800 shadow-sm">
+              <insight.icon className={`w-4 h-4 ${insight.color}`} />
+              <span className="text-sm text-gray-700 dark:text-gray-300">{insight.message}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total Tickets" value={stats.total} icon={Inbox} color="bg-indigo-500" trend={stats.totalTrend} trendLabel="vs. yesterday" />
         <StatCard title="Open Tickets" value={stats.open} icon={AlertCircle} color="bg-red-500" trend={stats.openTrend} trendLabel="vs. yesterday" />
@@ -209,12 +229,69 @@ export default function Dashboard() {
         <StatCard title="Resolved" value={stats.closed} icon={CheckCircle} color="bg-green-500" subtext="Successfully closed" />
       </div>
 
-      {/* Charts Row 1: Comparison + Sentiment */}
+      {/* Charts Row 1: Games Pie + Today's Sentiment */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Games Pie Chart */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tickets by Game</h3>
+          <div className="h-[220px] w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={gameStats} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                  {gameStats.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
+              <span className="text-xs text-gray-500">Total</span>
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-3 mt-2">
+            {gameStats.map((g, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                <span className="text-gray-600 dark:text-gray-300">{g.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Today's Sentiment */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Today's Sentiment</h3>
+          <div className="h-[220px] w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={todaySentiment} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                  {todaySentiment.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={SENTIMENT_COLORS[entry.name as keyof typeof SENTIMENT_COLORS] || '#6B7280'} strokeWidth={0} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex justify-center gap-4 mt-2">
+            {todaySentiment.map((s, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SENTIMENT_COLORS[s.name as keyof typeof SENTIMENT_COLORS] }} />
+                <span className="text-gray-600 dark:text-gray-300">{s.name}: {s.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Row 2: Comparison + Weekly Volume */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Today vs Yesterday */}
         <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Today vs Yesterday</h3>
-          <div className="h-[250px] w-full">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Today vs Yesterday</h3>
+          <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={comparisonData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} vertical={false} />
@@ -228,38 +305,10 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Sentiment Pie */}
+        {/* Weekly Volume */}
         <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Sentiment Distribution</h3>
-          <div className="h-[250px] w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={sentimentData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value">
-                  {sentimentData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={SENTIMENT_COLORS[entry.name as keyof typeof SENTIMENT_COLORS] || '#6B7280'} strokeWidth={0} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-center gap-4 mt-4">
-            {sentimentData.map((s, i) => (
-              <div key={i} className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SENTIMENT_COLORS[s.name as keyof typeof SENTIMENT_COLORS] }} />
-                <span className="text-gray-600 dark:text-gray-300">{s.name}: {s.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Charts Row 2: Timeline + Games + Tags */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Ticket Volume */}
-        <div className="lg:col-span-2 rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Weekly Volume</h3>
-          <div className="h-[220px] w-full">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Weekly Volume</h3>
+          <div className="h-[200px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
@@ -277,39 +326,23 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </div>
         </div>
-
-        {/* Top Tags */}
-        <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Top Tags</h3>
-          {topTags.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No tags yet</div>
-          ) : (
-            <div className="space-y-3">
-              {topTags.map((tag, i) => (
-                <div key={i} className="flex items-center justify-between">
-                  <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{tag.name}</span>
-                  <span className="text-gray-900 dark:text-white font-semibold">{tag.value}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Games Pie */}
+      {/* Top Tags */}
       <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Tickets by Game</h3>
-        <div className="h-[200px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={gameStats} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} horizontal={false} />
-              <XAxis type="number" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis dataKey="name" type="category" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} width={100} />
-              <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
-              <Bar dataKey="value" fill="#6366F1" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Top Tags</h3>
+        {topTags.length === 0 ? (
+          <div className="text-center py-4 text-gray-500">No tags yet</div>
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            {topTags.map((tag, i) => (
+              <div key={i} className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-900/20 px-4 py-2 rounded-full">
+                <span className="text-indigo-700 dark:text-indigo-300 font-medium">{tag.name}</span>
+                <span className="bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200 text-xs px-2 py-0.5 rounded-full font-bold">{tag.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
