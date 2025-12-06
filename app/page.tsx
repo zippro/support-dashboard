@@ -1,9 +1,8 @@
 'use client'
-// Trigger Vercel rebuild
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Activity, MessageSquare, Users, Clock, CheckCircle, AlertCircle, Inbox, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Activity, MessageSquare, Users, Clock, CheckCircle, AlertCircle, Inbox, TrendingUp, TrendingDown, Minus, Smile, Meh, Frown, Angry, Tag, AlertTriangle } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -23,8 +22,9 @@ import {
 } from 'recharts'
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+const SENTIMENT_COLORS = { Positive: '#10B981', Neutral: '#6B7280', Negative: '#F59E0B', Angry: '#EF4444' }
 
-function StatCard({ title, value, icon: Icon, color, trend, trendLabel }: any) {
+function StatCard({ title, value, icon: Icon, color, trend, trendLabel, subtext }: any) {
   const isPositive = trend > 0
   const isNeutral = trend === 0
 
@@ -47,7 +47,7 @@ function StatCard({ title, value, icon: Icon, color, trend, trendLabel }: any) {
       <div>
         <p className="text-sm font-medium text-gray-500 dark:text-gray-400">{title}</p>
         <h3 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mt-1">{value}</h3>
-        {trendLabel && <p className="text-xs text-gray-400 mt-2">{trendLabel}</p>}
+        {(trendLabel || subtext) && <p className="text-xs text-gray-400 mt-2">{trendLabel || subtext}</p>}
       </div>
     </div>
   )
@@ -55,27 +55,25 @@ function StatCard({ title, value, icon: Icon, color, trend, trendLabel }: any) {
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
-    total: 0,
-    open: 0,
-    closed: 0,
-    pending: 0,
-    totalTrend: 0,
-    openTrend: 0
+    total: 0, open: 0, closed: 0, pending: 0, totalTrend: 0, openTrend: 0, important: 0
   })
   const [gameStats, setGameStats] = useState<any[]>([])
   const [timelineData, setTimelineData] = useState<any[]>([])
+  const [sentimentData, setSentimentData] = useState<any[]>([])
+  const [comparisonData, setComparisonData] = useState<any[]>([])
+  const [topTags, setTopTags] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function fetchStats() {
       const now = new Date()
-      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000)
       const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-      // Fetch all tickets (optimize later with server-side aggregation if needed)
       const { data: tickets } = await supabase
         .from('tickets')
-        .select('status, project_id, created_at')
+        .select('status, project_id, created_at, sentiment, importance, tags')
         .order('created_at', { ascending: true })
 
       if (tickets) {
@@ -84,23 +82,57 @@ export default function Dashboard() {
         const open = tickets.filter(t => t.status === 'open').length
         const closed = tickets.filter(t => t.status === 'closed').length
         const pending = tickets.filter(t => t.status === 'pending').length
+        const important = tickets.filter(t => t.importance === 'important').length
 
-        // 2. Trends (Last 24h vs Previous 24h)
-        const last24h = tickets.filter(t => new Date(t.created_at) >= yesterday)
-        const prev24h = tickets.filter(t => {
+        // 2. Today vs Yesterday
+        const todayTickets = tickets.filter(t => new Date(t.created_at) >= todayStart)
+        const yesterdayTickets = tickets.filter(t => {
           const d = new Date(t.created_at)
-          return d >= new Date(yesterday.getTime() - 24 * 60 * 60 * 1000) && d < yesterday
+          return d >= yesterdayStart && d < todayStart
         })
 
-        const totalTrend = prev24h.length === 0 ? 100 : Math.round(((last24h.length - prev24h.length) / prev24h.length) * 100)
+        const totalTrend = yesterdayTickets.length === 0 ? (todayTickets.length > 0 ? 100 : 0) :
+          Math.round(((todayTickets.length - yesterdayTickets.length) / yesterdayTickets.length) * 100)
 
-        const openLast24h = last24h.filter(t => t.status === 'open').length
-        const openPrev24h = prev24h.filter(t => t.status === 'open').length
-        const openTrend = openPrev24h === 0 ? (openLast24h > 0 ? 100 : 0) : Math.round(((openLast24h - openPrev24h) / openPrev24h) * 100)
+        const openToday = todayTickets.filter(t => t.status === 'open').length
+        const openYesterday = yesterdayTickets.filter(t => t.status === 'open').length
+        const openTrend = openYesterday === 0 ? (openToday > 0 ? 100 : 0) :
+          Math.round(((openToday - openYesterday) / openYesterday) * 100)
 
-        setStats({ total, open, closed, pending, totalTrend, openTrend })
+        setStats({ total, open, closed, pending, totalTrend, openTrend, important })
 
-        // 3. Game Stats
+        // 3. Comparison Data (Today vs Yesterday)
+        setComparisonData([
+          { name: 'Total', yesterday: yesterdayTickets.length, today: todayTickets.length },
+          { name: 'Open', yesterday: yesterdayTickets.filter(t => t.status === 'open').length, today: todayTickets.filter(t => t.status === 'open').length },
+          { name: 'Closed', yesterday: yesterdayTickets.filter(t => t.status === 'closed').length, today: todayTickets.filter(t => t.status === 'closed').length },
+          { name: 'Important', yesterday: yesterdayTickets.filter(t => t.importance === 'important').length, today: todayTickets.filter(t => t.importance === 'important').length },
+        ])
+
+        // 4. Sentiment Distribution
+        const sentimentCounts: Record<string, number> = { Positive: 0, Neutral: 0, Negative: 0, Angry: 0 }
+        tickets.forEach(t => {
+          const s = t.sentiment || 'Neutral'
+          if (sentimentCounts[s] !== undefined) sentimentCounts[s]++
+          else sentimentCounts['Neutral']++
+        })
+        setSentimentData(Object.entries(sentimentCounts).map(([name, value]) => ({ name, value })))
+
+        // 5. Top Tags
+        const tagCounts: Record<string, number> = {}
+        tickets.forEach(t => {
+          const tags = t.tags || []
+          tags.forEach((tag: string) => {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1
+          })
+        })
+        const sortedTags = Object.entries(tagCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([name, value]) => ({ name, value }))
+        setTopTags(sortedTags)
+
+        // 6. Game Stats
         const projectCounts: Record<string, number> = {}
         tickets.forEach(t => {
           const pid = t.project_id || 'Unknown'
@@ -112,36 +144,28 @@ export default function Dashboard() {
         projects?.forEach(p => projectMap[p.project_id] = p.game_name)
 
         const chartData = Object.entries(projectCounts).map(([pid, count]) => ({
-          name: projectMap[pid] || pid,
+          name: projectMap[pid] || pid.slice(0, 8) + '...',
           value: count
-        })).sort((a, b) => b.value - a.value).slice(0, 5) // Top 5
-
+        })).sort((a, b) => b.value - a.value).slice(0, 5)
         setGameStats(chartData)
 
-        // 4. Timeline Data (Last 7 Days)
+        // 7. Timeline Data (Last 7 Days)
         const daysMap: Record<string, number> = {}
-        // Initialize last 7 days with 0
         for (let i = 6; i >= 0; i--) {
           const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000)
-          const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          const key = d.toLocaleDateString('en-US', { weekday: 'short' })
           daysMap[key] = 0
         }
 
         tickets.forEach(t => {
           const d = new Date(t.created_at)
           if (d >= lastWeek) {
-            const key = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-            if (daysMap[key] !== undefined) {
-              daysMap[key]++
-            }
+            const key = d.toLocaleDateString('en-US', { weekday: 'short' })
+            if (daysMap[key] !== undefined) daysMap[key]++
           }
         })
 
-        const timeline = Object.entries(daysMap).map(([date, count]) => ({
-          date,
-          tickets: count
-        }))
-        setTimelineData(timeline)
+        setTimelineData(Object.entries(daysMap).map(([date, count]) => ({ date, tickets: count })))
       }
       setLoading(false)
     }
@@ -150,14 +174,10 @@ export default function Dashboard() {
 
     const channel = supabase
       .channel('dashboard-stats')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => {
-        fetchStats()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchStats())
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [])
 
   if (loading) {
@@ -173,55 +193,73 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Analytics Dashboard</h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">Overview of support performance and key metrics.</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">Support performance & insights</p>
         </div>
         <div className="flex items-center gap-2 text-sm text-gray-500 bg-white dark:bg-gray-900 px-3 py-1.5 rounded-md border dark:border-gray-800 shadow-sm">
           <Clock className="w-4 h-4" />
-          <span>Last updated: {new Date().toLocaleTimeString()}</span>
+          <span>Updated: {new Date().toLocaleTimeString()}</span>
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid - Row 1 */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Tickets"
-          value={stats.total}
-          icon={Inbox}
-          color="bg-indigo-500"
-          trend={stats.totalTrend}
-          trendLabel="vs. previous 24h"
-        />
-        <StatCard
-          title="Open Tickets"
-          value={stats.open}
-          icon={AlertCircle}
-          color="bg-red-500"
-          trend={stats.openTrend}
-          trendLabel="vs. previous 24h"
-        />
-        <StatCard
-          title="Pending"
-          value={stats.pending}
-          icon={Clock}
-          color="bg-yellow-500"
-          subtext="Waiting for response"
-        />
-        <StatCard
-          title="Resolved"
-          value={stats.closed}
-          icon={CheckCircle}
-          color="bg-green-500"
-          subtext="Successfully closed"
-        />
+        <StatCard title="Total Tickets" value={stats.total} icon={Inbox} color="bg-indigo-500" trend={stats.totalTrend} trendLabel="vs. yesterday" />
+        <StatCard title="Open Tickets" value={stats.open} icon={AlertCircle} color="bg-red-500" trend={stats.openTrend} trendLabel="vs. yesterday" />
+        <StatCard title="Important" value={stats.important} icon={AlertTriangle} color="bg-orange-500" subtext="Needs attention" />
+        <StatCard title="Resolved" value={stats.closed} icon={CheckCircle} color="bg-green-500" subtext="Successfully closed" />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+      {/* Charts Row 1: Comparison + Sentiment */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Today vs Yesterday */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Today vs Yesterday</h3>
+          <div className="h-[250px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={comparisonData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} vertical={false} />
+                <XAxis dataKey="name" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
+                <Bar dataKey="yesterday" fill="#9CA3AF" radius={[4, 4, 0, 0]} name="Yesterday" />
+                <Bar dataKey="today" fill="#6366F1" radius={[4, 4, 0, 0]} name="Today" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
 
-        {/* Line Chart: Volume Over Time */}
-        <div className="col-span-4 rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Ticket Volume (Last 7 Days)</h3>
-          <div className="h-[300px] w-full">
+        {/* Sentiment Pie */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Sentiment Distribution</h3>
+          <div className="h-[250px] w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={sentimentData} cx="50%" cy="50%" innerRadius={60} outerRadius={85} paddingAngle={5} dataKey="value">
+                  {sentimentData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={SENTIMENT_COLORS[entry.name as keyof typeof SENTIMENT_COLORS] || '#6B7280'} strokeWidth={0} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex justify-center gap-4 mt-4">
+            {sentimentData.map((s, i) => (
+              <div key={i} className="flex items-center gap-1.5 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SENTIMENT_COLORS[s.name as keyof typeof SENTIMENT_COLORS] }} />
+                <span className="text-gray-600 dark:text-gray-300">{s.name}: {s.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Row 2: Timeline + Games + Tags */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Ticket Volume */}
+        <div className="lg:col-span-2 rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Weekly Volume</h3>
+          <div className="h-[220px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timelineData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
@@ -231,77 +269,46 @@ export default function Dashboard() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} vertical={false} />
-                <XAxis
-                  dataKey="date"
-                  stroke="#9CA3AF"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#9CA3AF"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `${value}`}
-                />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                  itemStyle={{ color: '#fff' }}
-                  cursor={{ stroke: '#6366F1', strokeWidth: 2 }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="tickets"
-                  stroke="#6366F1"
-                  strokeWidth={3}
-                  fillOpacity={1}
-                  fill="url(#colorTickets)"
-                />
+                <XAxis dataKey="date" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
+                <Area type="monotone" dataKey="tickets" stroke="#6366F1" strokeWidth={3} fillOpacity={1} fill="url(#colorTickets)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Pie Chart: Tickets by Game */}
-        <div className="col-span-3 rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Top Games by Volume</h3>
-          <div className="h-[300px] w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={gameStats}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={80}
-                  outerRadius={100}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {gameStats.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }}
-                  itemStyle={{ color: '#fff' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            {/* Center Text */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</span>
-              <span className="text-xs text-gray-500 uppercase tracking-wider">Tickets</span>
+        {/* Top Tags */}
+        <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Top Tags</h3>
+          {topTags.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">No tags yet</div>
+          ) : (
+            <div className="space-y-3">
+              {topTags.map((tag, i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded-full text-sm font-medium">{tag.name}</span>
+                  <span className="text-gray-900 dark:text-white font-semibold">{tag.value}</span>
+                </div>
+              ))}
             </div>
-          </div>
-          <div className="mt-4 flex flex-wrap justify-center gap-3">
-            {gameStats.map((entry, index) => (
-              <div key={index} className="flex items-center gap-1.5 text-xs">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
-                <span className="text-gray-600 dark:text-gray-300 font-medium">{entry.name}</span>
-              </div>
-            ))}
-          </div>
+          )}
+        </div>
+      </div>
+
+      {/* Games Pie */}
+      <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Tickets by Game</h3>
+        <div className="h-[200px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={gameStats} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.1} horizontal={false} />
+              <XAxis type="number" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis dataKey="name" type="category" stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} width={100} />
+              <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: 'none', borderRadius: '8px', color: '#fff' }} />
+              <Bar dataKey="value" fill="#6366F1" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
