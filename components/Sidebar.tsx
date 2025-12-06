@@ -21,12 +21,10 @@ export function Sidebar() {
     const [openTicketCount, setOpenTicketCount] = useState(0)
     const { isAuthenticated, profile, signOut, isLoading } = useAuth()
 
-    // Don't show sidebar on login/register pages
-    if (pathname === '/login' || pathname === '/register') {
-        return null
-    }
-
     useEffect(() => {
+        // Skip fetching if on login/register pages
+        if (pathname === '/login' || pathname === '/register') return
+
         async function fetchOpenTicketCount() {
             const { count, error } = await supabase
                 .from('tickets')
@@ -55,7 +53,12 @@ export function Sidebar() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [])
+    }, [pathname])
+
+    // Don't show sidebar on login/register pages
+    if (pathname === '/login' || pathname === '/register') {
+        return null
+    }
 
     return (
         <div className="flex h-full w-72 flex-col bg-black border-r border-gray-800 text-white shadow-xl">
