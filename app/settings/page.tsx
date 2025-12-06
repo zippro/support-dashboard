@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
-import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock } from 'lucide-react'
+import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send } from 'lucide-react'
 
 interface Project {
     id: string
@@ -24,7 +24,16 @@ interface ImportanceSettings {
     not_important_threshold: number
 }
 
-type TabType = 'games' | 'tags' | 'replies' | 'ai'
+interface AlertSetting {
+    id: string
+    key: string
+    enabled: boolean
+    threshold: number
+    min_count: number
+    webhook_url: string
+}
+
+type TabType = 'games' | 'tags' | 'replies' | 'ai' | 'alerts'
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabType>('games')
@@ -60,11 +69,18 @@ export default function SettingsPage() {
     const [threshold, setThreshold] = useState(10)
     const [savingImportance, setSavingImportance] = useState(false)
 
+    // Alert state
+    const [alertSettings, setAlertSettings] = useState<AlertSetting[]>([])
+    const [savingAlerts, setSavingAlerts] = useState(false)
+    const [testingAlert, setTestingAlert] = useState(false)
+    const [checkingAlerts, setCheckingAlerts] = useState(false)
+
     useEffect(() => {
         fetchProjects()
         fetchQuickReplies()
         fetchTags()
         fetchImportanceSettings()
+        fetchAlertSettings()
     }, [])
 
     async function fetchTags() {
@@ -88,6 +104,153 @@ export default function SettingsPage() {
             }
         } catch (err) {
             console.error('Error fetching importance settings:', err)
+        }
+    }
+
+    async function fetchAlertSettings() {
+        try {
+            const { data, error } = await supabase.from('alert_settings').select('*')
+            if (error) throw error
+            setAlertSettings(data || [])
+        } catch (err) {
+            console.error('Error fetching alert settings:', err)
+        }
+    }
+
+    async function updateAlertSetting(key: string, updates: Partial<AlertSetting>) {
+        try {
+            setSavingAlerts(true)
+            const { error } = await supabase.from('alert_settings').update(updates).eq('key', key)
+            if (error) throw error
+            setAlertSettings(prev => prev.map(s => s.key === key ? { ...s, ...updates } : s))
+        } catch (err) {
+            console.error('Error updating alert setting:', err)
+        } finally {
+            setSavingAlerts(false)
+        }
+    }
+
+    async function testAlert() {
+        const webhookUrl = alertSettings.find(s => s.key === 'game_spike_alert')?.webhook_url
+        if (!webhookUrl) return
+
+        setTestingAlert(true)
+        try {
+            await fetch(webhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: '🔔 **Test Alert** - Your alert system is working correctly!'
+                })
+            })
+        } catch (err) {
+            console.error('Error sending test alert:', err)
+        } finally {
+            setTestingAlert(false)
+        }
+    }
+
+    async function checkAlerts() {
+        setCheckingAlerts(true)
+        try {
+            // Get today's and yesterday's dates
+            const today = new Date()
+            const yesterday = new Date(today)
+            yesterday.setDate(yesterday.getDate() - 1)
+            const todayStr = today.toISOString().split('T')[0]
+            const yesterdayStr = yesterday.toISOString().split('T')[0]
+
+            // Get game spike setting
+            const gameSetting = alertSettings.find(s => s.key === 'game_spike_alert')
+            const totalSetting = alertSettings.find(s => s.key === 'total_spike_alert')
+            const webhookUrl = gameSetting?.webhook_url
+
+            if (!webhookUrl) return
+
+            // Fetch today's tickets by game
+            const { data: todayTickets } = await supabase
+                .from('tickets')
+                .select('project_id, game_name')
+                .gte('created_at', todayStr + 'T00:00:00')
+                .lt('created_at', todayStr + 'T23:59:59')
+
+            // Fetch yesterday's tickets by game
+            const { data: yesterdayTickets } = await supabase
+                .from('tickets')
+                .select('project_id, game_name')
+                .gte('created_at', yesterdayStr + 'T00:00:00')
+                .lt('created_at', yesterdayStr + 'T23:59:59')
+
+            // Count by game
+            const todayByGame: Record<string, number> = {}
+            const yesterdayByGame: Record<string, number> = {}
+
+            todayTickets?.forEach(t => {
+                const game = t.game_name || t.project_id || 'Unknown'
+                todayByGame[game] = (todayByGame[game] || 0) + 1
+            })
+
+            yesterdayTickets?.forEach(t => {
+                const game = t.game_name || t.project_id || 'Unknown'
+                yesterdayByGame[game] = (yesterdayByGame[game] || 0) + 1
+            })
+
+            const alerts: string[] = []
+
+            // Check game spike alerts
+            if (gameSetting?.enabled) {
+                for (const game in todayByGame) {
+                    const todayCount = todayByGame[game]
+                    const yesterdayCount = yesterdayByGame[game] || 0
+                    const minCount = gameSetting.min_count || 5
+                    const thresholdPct = gameSetting.threshold || 20
+
+                    if (todayCount >= minCount && yesterdayCount > 0) {
+                        const increase = ((todayCount - yesterdayCount) / yesterdayCount) * 100
+                        if (increase >= thresholdPct) {
+                            alerts.push(`🚨 **${game}** has ${todayCount} tickets today (+${Math.round(increase)}% from yesterday)!`)
+                        }
+                    }
+                }
+            }
+
+            // Check total spike
+            if (totalSetting?.enabled) {
+                const totalToday = todayTickets?.length || 0
+                const totalYesterday = yesterdayTickets?.length || 0
+                const minCount = totalSetting.min_count || 5
+                const thresholdPct = totalSetting.threshold || 20
+
+                if (totalToday >= minCount && totalYesterday > 0) {
+                    const increase = ((totalToday - totalYesterday) / totalYesterday) * 100
+                    if (increase >= thresholdPct) {
+                        alerts.push(`🚨 We have **${totalToday} tickets** today (+${Math.round(increase)}% from yesterday)!`)
+                    }
+                }
+            }
+
+            // Send alerts to Discord
+            if (alerts.length > 0) {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: alerts.join('\n\n')
+                    })
+                })
+            } else {
+                await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: '✅ No alerts triggered - ticket counts are within normal range.'
+                    })
+                })
+            }
+        } catch (err) {
+            console.error('Error checking alerts:', err)
+        } finally {
+            setCheckingAlerts(false)
         }
     }
 
@@ -261,6 +424,7 @@ export default function SettingsPage() {
         { id: 'tags' as TabType, label: 'Tags', icon: Tag, count: tags.length },
         { id: 'replies' as TabType, label: 'Quick Replies', icon: MessageSquare, count: quickReplies.length },
         { id: 'ai' as TabType, label: 'AI Settings', icon: Settings, count: null },
+        { id: 'alerts' as TabType, label: 'Alerts', icon: Bell, count: alertSettings.filter(s => s.enabled).length },
     ]
 
     return (
@@ -451,6 +615,186 @@ export default function SettingsPage() {
                                 <button type="submit" disabled={savingImportance || !isAuthenticated} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">{savingImportance ? 'Saving...' : 'Save Settings'}</button>
                             </form>
                         </div>
+                    </div>
+                )}
+
+                {/* Alerts Tab */}
+                {activeTab === 'alerts' && (
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800">
+                            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Discord Alerts</h2>
+                                <p className="text-sm text-gray-500 mt-1">Get notified when ticket counts spike above normal levels</p>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                {/* Game Spike Alert */}
+                                {alertSettings.find(s => s.key === 'game_spike_alert') && (
+                                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                                                <Gamepad2 className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium text-gray-900 dark:text-white">Game Spike Alert</h3>
+                                                <p className="text-sm text-gray-500 mt-1">Alert when a game's tickets increase by {alertSettings.find(s => s.key === 'game_spike_alert')?.threshold}%+ vs yesterday</p>
+                                                <div className="flex items-center gap-4 mt-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Threshold:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'game_spike_alert')?.threshold || 20}
+                                                            onChange={(e) => updateAlertSetting('game_spike_alert', { threshold: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                        <span className="text-xs text-gray-500">%</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Min tickets:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'game_spike_alert')?.min_count || 5}
+                                                            onChange={(e) => updateAlertSetting('game_spike_alert', { min_count: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateAlertSetting('game_spike_alert', { enabled: !alertSettings.find(s => s.key === 'game_spike_alert')?.enabled })}
+                                            disabled={!isAuthenticated}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${alertSettings.find(s => s.key === 'game_spike_alert')?.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertSettings.find(s => s.key === 'game_spike_alert')?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Total Spike Alert */}
+                                {alertSettings.find(s => s.key === 'total_spike_alert') && (
+                                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-lg flex items-center justify-center">
+                                                <Bell className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium text-gray-900 dark:text-white">Total Ticket Spike Alert</h3>
+                                                <p className="text-sm text-gray-500 mt-1">Alert when total tickets increase by {alertSettings.find(s => s.key === 'total_spike_alert')?.threshold}%+ vs yesterday</p>
+                                                <div className="flex items-center gap-4 mt-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Threshold:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'total_spike_alert')?.threshold || 20}
+                                                            onChange={(e) => updateAlertSetting('total_spike_alert', { threshold: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                        <span className="text-xs text-gray-500">%</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Min tickets:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'total_spike_alert')?.min_count || 5}
+                                                            onChange={(e) => updateAlertSetting('total_spike_alert', { min_count: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateAlertSetting('total_spike_alert', { enabled: !alertSettings.find(s => s.key === 'total_spike_alert')?.enabled })}
+                                            disabled={!isAuthenticated}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${alertSettings.find(s => s.key === 'total_spike_alert')?.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertSettings.find(s => s.key === 'total_spike_alert')?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Tag Spike Alert */}
+                                {alertSettings.find(s => s.key === 'tag_spike_alert') && (
+                                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                                                <Tag className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium text-gray-900 dark:text-white">Tag Spike Alert</h3>
+                                                <p className="text-sm text-gray-500 mt-1">Alert when a tag has {alertSettings.find(s => s.key === 'tag_spike_alert')?.threshold}%+ more tickets this week vs last week</p>
+                                                <div className="flex items-center gap-4 mt-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Threshold:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'tag_spike_alert')?.threshold || 50}
+                                                            onChange={(e) => updateAlertSetting('tag_spike_alert', { threshold: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                        <span className="text-xs text-gray-500">%</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Min tickets:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'tag_spike_alert')?.min_count || 3}
+                                                            onChange={(e) => updateAlertSetting('tag_spike_alert', { min_count: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateAlertSetting('tag_spike_alert', { enabled: !alertSettings.find(s => s.key === 'tag_spike_alert')?.enabled })}
+                                            disabled={!isAuthenticated}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${alertSettings.find(s => s.key === 'tag_spike_alert')?.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertSettings.find(s => s.key === 'tag_spike_alert')?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {alertSettings.length === 0 && (
+                                    <div className="text-center py-8 text-gray-500">
+                                        <Bell className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                        <p>No alert settings found. Run the database migration first.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Actions */}
+                        {isAuthenticated && alertSettings.length > 0 && (
+                            <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+                                <h3 className="font-medium text-gray-900 dark:text-white mb-4">Actions</h3>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={testAlert}
+                                        disabled={testingAlert}
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50"
+                                    >
+                                        <Send className="w-4 h-4" />
+                                        {testingAlert ? 'Sending...' : 'Send Test Alert'}
+                                    </button>
+                                    <button
+                                        onClick={checkAlerts}
+                                        disabled={checkingAlerts}
+                                        className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                                    >
+                                        <Bell className="w-4 h-4" />
+                                        {checkingAlerts ? 'Checking...' : 'Check Alerts Now'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
