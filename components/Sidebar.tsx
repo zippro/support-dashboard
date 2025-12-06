@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Home, Inbox, Settings, User } from 'lucide-react'
+import { Home, Inbox, Settings, BarChart2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase'
 const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Tickets', href: '/tickets', icon: Inbox },
+    { name: 'Analytics', href: '/analytics', icon: BarChart2 },
     { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
