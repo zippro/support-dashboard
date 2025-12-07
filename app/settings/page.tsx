@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
-import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send, FileText, Calendar } from 'lucide-react'
+import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send, FileText, Calendar, Mail } from 'lucide-react'
 
 interface Project {
     id: string
@@ -36,13 +36,16 @@ interface AlertSetting {
 interface ReportSetting {
     id: string
     key: string
+    value: any
     enabled: boolean
     webhook_url: string
-    schedule_hour: number
-    timezone: string
+    frontend_url?: string
+    sender_email?: string
+    schedule_hour?: number
+    timezone?: string
 }
 
-type TabType = 'games' | 'tags' | 'replies' | 'ai' | 'alerts' | 'reports'
+type TabType = 'games' | 'tags' | 'replies' | 'ai' | 'alerts' | 'reports' | 'email'
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabType>('games')
@@ -560,6 +563,7 @@ export default function SettingsPage() {
         { id: 'replies' as TabType, label: 'Quick Replies', icon: MessageSquare, count: quickReplies.length },
         { id: 'ai' as TabType, label: 'AI Settings', icon: Settings, count: null },
         { id: 'alerts' as TabType, label: 'Alerts', icon: Bell, count: alertSettings.filter(s => s.enabled).length },
+        { id: 'email' as TabType, label: 'Email', icon: Mail, count: null },
         { id: 'reports' as TabType, label: 'Reports', icon: FileText, count: reportSettings.filter(s => s.enabled).length },
     ]
 
@@ -999,6 +1003,79 @@ export default function SettingsPage() {
                                 </p>
                             </div>
                         )}
+                    </div>
+                )}
+                {/* Email Tab */}
+                {activeTab === 'email' && (
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800">
+                            <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Email Reply Configuration</h2>
+                                <p className="text-sm text-gray-500 mt-1">Configure how email replies are sent to users</p>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                {/* Email Reply Config */}
+                                {reportSettings.find(s => s.key === 'email_reply') ? (
+                                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        <div className="flex items-start gap-4 w-full">
+                                            <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                                                <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            <div className="flex-1 space-y-4">
+                                                <div>
+                                                    <div className="flex items-center justify-between">
+                                                        <h3 className="font-medium text-gray-900 dark:text-white">Email Reply System</h3>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={reportSettings.find(s => s.key === 'email_reply')?.enabled || false}
+                                                                onChange={(e) => updateReportSetting('email_reply', { enabled: e.target.checked })}
+                                                                disabled={!isAuthenticated}
+                                                                className="sr-only peer"
+                                                            />
+                                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                                                        </label>
+                                                    </div>
+                                                    <p className="text-sm text-gray-500 mt-1">Automatically send replies to user via email</p>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-500 mb-1">Sender Email</label>
+                                                        <input
+                                                            type="email"
+                                                            value={reportSettings.find(s => s.key === 'email_reply')?.sender_email || ''}
+                                                            onChange={(e) => updateReportSetting('email_reply', { sender_email: e.target.value })}
+                                                            placeholder="support@narcade.com"
+                                                            disabled={!isAuthenticated}
+                                                            className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50 focus:ring-2 focus:ring-indigo-500"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-500 mb-1">Reply Webhook URL (N8n)</label>
+                                                        <input
+                                                            type="text"
+                                                            value={reportSettings.find(s => s.key === 'email_reply')?.webhook_url || ''}
+                                                            onChange={(e) => updateReportSetting('email_reply', { webhook_url: e.target.value })}
+                                                            placeholder="https://n8n.your-domain.com/webhook/..."
+                                                            disabled={!isAuthenticated}
+                                                            className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50 focus:ring-2 focus:ring-indigo-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs text-gray-400">
+                                                    Replies will be sent to this webhook with ticket details, content, and agent info.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <p className="text-gray-500">Email settings not initialized.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

@@ -8,12 +8,13 @@ import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle,
 
 export default function TicketDetail() {
     const { id } = useParams()
-    const { isAuthenticated } = useAuth()
+    const { isAuthenticated, user } = useAuth()
     const [ticket, setTicket] = useState<any>(null)
     const [messages, setMessages] = useState<any[]>([])
     const [newMessage, setNewMessage] = useState('')
     const [sendEmail, setSendEmail] = useState(false)
     const [loading, setLoading] = useState(true)
+    const [emailSettings, setEmailSettings] = useState<any>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const [quickReplies, setQuickReplies] = useState<{ title: string, reply: string }[]>([])
@@ -23,6 +24,18 @@ export default function TicketDetail() {
     const [pendingMessage, setPendingMessage] = useState<{ original: string, translated: string | null, translate: boolean } | null>(null)
     const [attachment, setAttachment] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+
+    useEffect(() => {
+        async function fetchSettings() {
+            const { data } = await supabase
+                .from('report_settings')
+                .select('*')
+                .eq('key', 'email_reply')
+                .maybeSingle()
+            if (data) setEmailSettings(data)
+        }
+        if (isAuthenticated) fetchSettings()
+    }, [isAuthenticated])
 
     useEffect(() => {
         async function fetchQuickReplies() {
@@ -149,10 +162,19 @@ export default function TicketDetail() {
             attachmentUrls.push(publicUrl)
         }
 
-        // Send email via n8n (always enabled now)
+        // Logic to construct final message with signature if email enabled
         let finalContent = newMessage
         let translatedContent = null
+        let signature = ''
 
+        // Append Agent Signature if email is enabled
+        if (emailSettings?.enabled && user) {
+            const agentName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Support Agent'
+            signature = `\n\nBest regards,\n${agentName}`
+            finalContent += signature
+        }
+
+        // Translation Logic
         if (ticket?.users?.email && newMessage.trim()) {
             if (translate) setIsTranslating(true)
             try {
@@ -161,13 +183,13 @@ export default function TicketDetail() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ticket_id: id,
-                        message: newMessage,
+                        message: newMessage, // Translation uses original message without signature usually? Or with? Usually context matters. I'll send original.
                         user_email: ticket.users.email,
                         subject: ticket.subject,
                         language: ticket.language,
-                        translate: translate,
-                        game_name: ticket.game_name || 'Support',
-                        attachments: attachmentUrls // Send attachments to n8n if needed
+                        translate: true,
+                        preview_only: true,
+                        game_name: ticket.game_name || 'Support'
                     })
                 })
 
@@ -175,18 +197,45 @@ export default function TicketDetail() {
                     try {
                         const data = await response.json()
                         if (data.message) {
-                            finalContent = data.message
-                            translatedContent = newMessage // Store original English as "translated" (source)
+                            // If translated, we want to append signature to the translated text too?
+                            // Or just keep the translation as is?
+                            // Usually signature is NOT translated or is static.
+                            // I'll append signature to final translated content if valid.
+                            translatedContent = data.message + signature // Append signature to translated text
+                            finalContent = newMessage + signature // Update finalContent to include signature
                         }
                     } catch (e) {
-                        console.warn('No JSON returned from webhook, using original message')
+                        console.warn('No JSON returned from webhook')
                     }
                 }
             } catch (err) {
-                console.error('Error triggering email webhook:', err)
-                alert('Failed to trigger webhook: ' + err)
+                console.error('Error triggering translation webhook:', err)
             } finally {
                 if (translate) setIsTranslating(false)
+            }
+        }
+
+        // EMAIL SENDING LOGIC via Custom Webhook (n8n)
+        if (emailSettings?.enabled && emailSettings?.webhook_url && ticket?.users?.email) {
+            try {
+                // Don't await this to keep UI responsive, or await if critical?
+                // Better to fire and forget or show toaster.
+                fetch(emailSettings.webhook_url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        ticket_id: id,
+                        to_email: ticket.users.email,
+                        cc_email: user?.email,
+                        from_email: emailSettings.sender_email,
+                        subject: `Re: ${ticket.subject} [#${ticket.ticket_id}]`, // detailed subject
+                        message: finalContent, // Includes signature
+                        agent_name: user?.user_metadata?.full_name || 'Support Agent',
+                        attachments: attachmentUrls
+                    })
+                }).catch(err => console.error("Email webhook failed", err))
+            } catch (e) {
+                console.error("Error initiating email", e)
             }
         }
 
