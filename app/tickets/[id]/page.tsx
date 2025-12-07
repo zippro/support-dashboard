@@ -450,7 +450,7 @@ export default function TicketDetail() {
 
                                     <div className={`text-[10px] mt-1.5 opacity-70 ${isAgent ? 'text-indigo-100' : 'text-gray-400'}`}>
                                         {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        {isAgent ? ' • Agent' : ' • User'}
+                                        {isAgent ? ` • ${user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Agent'}` : ' • User'}
                                     </div>
                                 </div>
                             </div>
