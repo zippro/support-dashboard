@@ -80,59 +80,68 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchStats() {
-      const now = new Date()
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000)
-      const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      try {
+        const now = new Date()
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000)
+        const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-      const { data: tickets } = await supabase.from('tickets').select('status, project_id, created_at, sentiment, importance, tags').order('created_at', { ascending: true })
-      const { data: projects } = await supabase.from('projects').select('project_id, game_name')
-      const pMap: Record<string, string> = {}
-      projects?.forEach(p => pMap[p.project_id] = p.game_name)
-      setProjectMap(pMap)
+        const { data: tickets, error: ticketsError } = await supabase.from('tickets').select('status, project_id, created_at, sentiment, importance, tags').order('created_at', { ascending: true })
+        if (ticketsError) throw ticketsError
 
-      if (tickets) {
-        setAllTickets(tickets)
-        const total = tickets.length, open = tickets.filter(t => t.status === 'open').length, closed = tickets.filter(t => t.status === 'closed').length, pending = tickets.filter(t => t.status === 'pending').length, important = tickets.filter(t => t.importance === 'important').length
-        const todayTickets = tickets.filter(t => new Date(t.created_at) >= todayStart)
-        const yesterdayTickets = tickets.filter(t => { const d = new Date(t.created_at); return d >= yesterdayStart && d < todayStart })
-        const weekTickets = tickets.filter(t => new Date(t.created_at) >= lastWeek)
-        const totalTrend = yesterdayTickets.length === 0 ? (todayTickets.length > 0 ? 100 : 0) : Math.round(((todayTickets.length - yesterdayTickets.length) / yesterdayTickets.length) * 100)
-        const openTrend = yesterdayTickets.filter(t => t.status === 'open').length === 0 ? (todayTickets.filter(t => t.status === 'open').length > 0 ? 100 : 0) : Math.round(((todayTickets.filter(t => t.status === 'open').length - yesterdayTickets.filter(t => t.status === 'open').length) / yesterdayTickets.filter(t => t.status === 'open').length) * 100)
-        setStats({ total, open, closed, pending, totalTrend, openTrend, important })
-        setComparisonData([
-          { name: 'Total', yesterday: yesterdayTickets.length, today: todayTickets.length },
-          { name: 'Open', yesterday: yesterdayTickets.filter(t => t.status === 'open').length, today: todayTickets.filter(t => t.status === 'open').length },
-          { name: 'Closed', yesterday: yesterdayTickets.filter(t => t.status === 'closed').length, today: todayTickets.filter(t => t.status === 'closed').length },
-          { name: 'Important', yesterday: yesterdayTickets.filter(t => t.importance === 'important').length, today: todayTickets.filter(t => t.importance === 'important').length },
-        ])
-        const todaySentimentCounts: Record<string, number> = { Positive: 0, Neutral: 0, Negative: 0, Angry: 0 }
-        todayTickets.forEach(t => { const s = t.sentiment || 'Neutral'; if (todaySentimentCounts[s] !== undefined) todaySentimentCounts[s]++; else todaySentimentCounts['Neutral']++ })
-        setTodaySentiment(Object.entries(todaySentimentCounts).map(([name, value]) => ({ name, value, emoji: SENTIMENT_EMOJIS[name as keyof typeof SENTIMENT_EMOJIS] })))
-        const tagCounts: Record<string, number> = {}
-        weekTickets.forEach(t => { (t.tags || []).forEach((tag: string) => { tagCounts[tag] = (tagCounts[tag] || 0) + 1 }) })
-        const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1])
-        setTopTags(sortedTags.slice(0, 5).map(([name, value]) => ({ name, value })))
-        const maxCount = sortedTags.length > 0 ? sortedTags[0][1] : 1
-        setTagCloud(sortedTags.slice(0, 15).map(([name, value]) => ({ name, value, size: Math.max(0.7, Math.min(1.5, (value / maxCount) * 1.5 + 0.5)) })))
-        setGameStats(computeGameStats(tickets, gamePeriod, pMap))
-        const daysMap: Record<string, number> = {}
-        for (let i = 6; i >= 0; i--) { const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000); daysMap[d.toLocaleDateString('en-US', { weekday: 'short' })] = 0 }
-        tickets.forEach(t => { const d = new Date(t.created_at); if (d >= lastWeek) { const key = d.toLocaleDateString('en-US', { weekday: 'short' }); if (daysMap[key] !== undefined) daysMap[key]++ } })
-        setTimelineData(Object.entries(daysMap).map(([date, count]) => ({ date, tickets: count })))
-        const newInsights: any[] = []
-        if (totalTrend > 50) newInsights.push({ icon: ArrowUp, message: `Volume up ${totalTrend}% today`, color: 'text-orange-500' })
-        else if (totalTrend < -30) newInsights.push({ icon: ArrowDown, message: `Volume down ${Math.abs(totalTrend)}%`, color: 'text-green-500' })
-        const angryToday = todayTickets.filter(t => t.sentiment === 'Angry').length
-        if (angryToday > 0) newInsights.push({ icon: AlertTriangle, message: `${angryToday} angry customer${angryToday > 1 ? 's' : ''} today!`, color: 'text-red-500' })
-        const importantOpen = tickets.filter(t => t.importance === 'important' && t.status === 'open').length
-        if (importantOpen > 0) newInsights.push({ icon: AlertCircle, message: `${importantOpen} important open`, color: 'text-red-500' })
-        const resolutionRate = total > 0 ? Math.round((closed / total) * 100) : 0
-        if (resolutionRate > 80) newInsights.push({ icon: CheckCircle, message: `${resolutionRate}% resolved!`, color: 'text-green-500' })
-        if (newInsights.length === 0) newInsights.push({ icon: CheckCircle, message: 'All good!', color: 'text-green-500' })
-        setInsights(newInsights)
+        const { data: projects, error: projectsError } = await supabase.from('projects').select('project_id, game_name')
+        if (projectsError) throw projectsError
+
+        const pMap: Record<string, string> = {}
+        projects?.forEach(p => pMap[p.project_id] = p.game_name)
+        setProjectMap(pMap)
+
+        if (tickets) {
+          setAllTickets(tickets)
+          const total = tickets.length, open = tickets.filter(t => t.status === 'open').length, closed = tickets.filter(t => t.status === 'closed').length, pending = tickets.filter(t => t.status === 'pending').length, important = tickets.filter(t => t.importance === 'important').length
+          const todayTickets = tickets.filter(t => new Date(t.created_at) >= todayStart)
+          const yesterdayTickets = tickets.filter(t => { const d = new Date(t.created_at); return d >= yesterdayStart && d < todayStart })
+          const weekTickets = tickets.filter(t => new Date(t.created_at) >= lastWeek)
+          const totalTrend = yesterdayTickets.length === 0 ? (todayTickets.length > 0 ? 100 : 0) : Math.round(((todayTickets.length - yesterdayTickets.length) / yesterdayTickets.length) * 100)
+          const openTrend = yesterdayTickets.filter(t => t.status === 'open').length === 0 ? (todayTickets.filter(t => t.status === 'open').length > 0 ? 100 : 0) : Math.round(((todayTickets.filter(t => t.status === 'open').length - yesterdayTickets.filter(t => t.status === 'open').length) / yesterdayTickets.filter(t => t.status === 'open').length) * 100)
+          setStats({ total, open, closed, pending, totalTrend, openTrend, important })
+          setComparisonData([
+            { name: 'Total', yesterday: yesterdayTickets.length, today: todayTickets.length },
+            { name: 'Open', yesterday: yesterdayTickets.filter(t => t.status === 'open').length, today: todayTickets.filter(t => t.status === 'open').length },
+            { name: 'Closed', yesterday: yesterdayTickets.filter(t => t.status === 'closed').length, today: todayTickets.filter(t => t.status === 'closed').length },
+            { name: 'Important', yesterday: yesterdayTickets.filter(t => t.importance === 'important').length, today: todayTickets.filter(t => t.importance === 'important').length },
+          ])
+          const todaySentimentCounts: Record<string, number> = { Positive: 0, Neutral: 0, Negative: 0, Angry: 0 }
+          todayTickets.forEach(t => { const s = t.sentiment || 'Neutral'; if (todaySentimentCounts[s] !== undefined) todaySentimentCounts[s]++; else todaySentimentCounts['Neutral']++ })
+          setTodaySentiment(Object.entries(todaySentimentCounts).map(([name, value]) => ({ name, value, emoji: SENTIMENT_EMOJIS[name as keyof typeof SENTIMENT_EMOJIS] })))
+          const tagCounts: Record<string, number> = {}
+          weekTickets.forEach(t => { (t.tags || []).forEach((tag: string) => { tagCounts[tag] = (tagCounts[tag] || 0) + 1 }) })
+          const sortedTags = Object.entries(tagCounts).sort((a, b) => b[1] - a[1])
+          setTopTags(sortedTags.slice(0, 5).map(([name, value]) => ({ name, value })))
+          const maxCount = sortedTags.length > 0 ? sortedTags[0][1] : 1
+          setTagCloud(sortedTags.slice(0, 15).map(([name, value]) => ({ name, value, size: Math.max(0.7, Math.min(1.5, (value / maxCount) * 1.5 + 0.5)) })))
+          setGameStats(computeGameStats(tickets, gamePeriod, pMap))
+          const daysMap: Record<string, number> = {}
+          for (let i = 6; i >= 0; i--) { const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000); daysMap[d.toLocaleDateString('en-US', { weekday: 'short' })] = 0 }
+          tickets.forEach(t => { const d = new Date(t.created_at); if (d >= lastWeek) { const key = d.toLocaleDateString('en-US', { weekday: 'short' }); if (daysMap[key] !== undefined) daysMap[key]++ } })
+          setTimelineData(Object.entries(daysMap).map(([date, count]) => ({ date, tickets: count })))
+          const newInsights: any[] = []
+          if (totalTrend > 50) newInsights.push({ icon: ArrowUp, message: `Volume up ${totalTrend}% today`, color: 'text-orange-500' })
+          else if (totalTrend < -30) newInsights.push({ icon: ArrowDown, message: `Volume down ${Math.abs(totalTrend)}%`, color: 'text-green-500' })
+          const angryToday = todayTickets.filter(t => t.sentiment === 'Angry').length
+          if (angryToday > 0) newInsights.push({ icon: AlertTriangle, message: `${angryToday} angry customer${angryToday > 1 ? 's' : ''} today!`, color: 'text-red-500' })
+          const importantOpen = tickets.filter(t => t.importance === 'important' && t.status === 'open').length
+          if (importantOpen > 0) newInsights.push({ icon: AlertCircle, message: `${importantOpen} important open`, color: 'text-red-500' })
+          const resolutionRate = total > 0 ? Math.round((closed / total) * 100) : 0
+          if (resolutionRate > 80) newInsights.push({ icon: CheckCircle, message: `${resolutionRate}% resolved!`, color: 'text-green-500' })
+          if (newInsights.length === 0) newInsights.push({ icon: CheckCircle, message: 'All good!', color: 'text-green-500' })
+          setInsights(newInsights)
+        }
+      } catch (error) {
+        console.error('Error fetching dashboard stats:', error)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     fetchStats()
     const channel = supabase.channel('dashboard').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchStats()).subscribe()
