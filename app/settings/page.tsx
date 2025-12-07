@@ -563,7 +563,6 @@ export default function SettingsPage() {
         { id: 'replies' as TabType, label: 'Quick Replies', icon: MessageSquare, count: quickReplies.length },
         { id: 'ai' as TabType, label: 'AI Settings', icon: Settings, count: null },
         { id: 'alerts' as TabType, label: 'Alerts', icon: Bell, count: alertSettings.filter(s => s.enabled).length },
-        { id: 'email' as TabType, label: 'Email', icon: Mail, count: null },
         { id: 'reports' as TabType, label: 'Reports', icon: FileText, count: reportSettings.filter(s => s.enabled).length },
     ]
 
