@@ -123,13 +123,37 @@ export default function TicketDetail() {
 
     const sendMessage = async (e: React.FormEvent, closeTicket = false, translate = false) => {
         e.preventDefault()
-        if (!newMessage.trim() || !id) return
+        if ((!newMessage.trim() && !attachment) || !id) return
+
+        let attachmentUrls: string[] = []
+
+        // Upload attachment if exists
+        if (attachment) {
+            const fileExt = attachment.name.split('.').pop()
+            const fileName = `${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+
+            const { error: uploadError } = await supabase.storage
+                .from('ticket-attachments')
+                .upload(fileName, attachment)
+
+            if (uploadError) {
+                console.error('Error uploading attachment:', uploadError)
+                alert('Failed to upload attachment: ' + uploadError.message)
+                return
+            }
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('ticket-attachments')
+                .getPublicUrl(fileName)
+
+            attachmentUrls.push(publicUrl)
+        }
 
         // Send email via n8n (always enabled now)
         let finalContent = newMessage
         let translatedContent = null
 
-        if (ticket?.users?.email) {
+        if (ticket?.users?.email && newMessage.trim()) {
             if (translate) setIsTranslating(true)
             try {
                 const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
@@ -142,7 +166,8 @@ export default function TicketDetail() {
                         subject: ticket.subject,
                         language: ticket.language,
                         translate: translate,
-                        game_name: ticket.game_name || 'Support'
+                        game_name: ticket.game_name || 'Support',
+                        attachments: attachmentUrls // Send attachments to n8n if needed
                     })
                 })
 
@@ -172,6 +197,7 @@ export default function TicketDetail() {
                 content: finalContent,
                 content_translated: translatedContent,
                 sender_type: 'agent',
+                attachments: attachmentUrls
             })
 
         if (error) {
@@ -193,6 +219,7 @@ export default function TicketDetail() {
         }
 
         setNewMessage('')
+        setAttachment(null)
     }
 
     if (loading) {
@@ -322,6 +349,35 @@ export default function TicketDetail() {
                                             <p className="text-xs text-gray-500 dark:text-gray-400 italic">
                                                 {message.content_translated}
                                             </p>
+                                        </div>
+                                    )}
+
+                                    {message.attachments && message.attachments.length > 0 && (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {message.attachments.map((url: string, idx: number) => (
+                                                <a
+                                                    key={idx}
+                                                    href={url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="block relative group overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-900 transition-transform hover:scale-105"
+                                                >
+                                                    <img
+                                                        src={url}
+                                                        alt="Attachment"
+                                                        className="object-cover w-32 h-32"
+                                                        onError={(e) => {
+                                                            // Fallback for non-image files
+                                                            e.currentTarget.style.display = 'none'
+                                                            e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                                                        }}
+                                                    />
+                                                    <div className="hidden absolute inset-0 flex items-center justify-center bg-gray-100 dark:bg-gray-800 p-2 text-center text-xs text-gray-500">
+                                                        <Paperclip className="w-6 h-6 mb-1 mx-auto opacity-50" />
+                                                        <span className="truncate w-full block">File</span>
+                                                    </div>
+                                                </a>
+                                            ))}
                                         </div>
                                     )}
 
