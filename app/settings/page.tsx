@@ -318,7 +318,7 @@ export default function SettingsPage() {
             const currentCount = currentTickets?.length || 0
             const previousCount = previousTickets?.length || 0
             const percentChange = previousCount > 0 ? Math.round(((currentCount - previousCount) / previousCount) * 100) : 0
-            const changeText = percentChange >= 0 ? `+${percentChange}% more` : `${percentChange}% less`
+            const changeText = percentChange >= 0 ? `+${percentChange}% more` : `${Math.abs(percentChange)}% less`
 
             // Count by game
             const gameCount: Record<string, number> = {}
@@ -342,30 +342,45 @@ export default function SettingsPage() {
             const closedCount = currentTickets?.filter(t => t.status === 'closed').length || 0
             const importantCount = importantTickets.length
 
-            // Build message
-            const reportTitle = isMonday ? '📊 **Weekend Report**' : '📊 **Daily Report**'
+            // Build Embed
+            const reportTitle = isMonday ? 'Weekend Report' : 'Daily Report'
             const periodText = isMonday ? 'Last 62 hours (Weekend)' : 'Last 24 hours'
 
-            const message = `${reportTitle}
-${periodText}
-
-📥 **Received ${currentCount} tickets** (${changeText} than previous period)
-
-🎮 **Top Games**
-${topGames.length > 0 ? topGames.join('\n') : '• No tickets received'}
-
-🚨 **Important Messages** (${importantCount})
-${importantList.length > 0 ? importantList.join('\n') : '• None flagged as important'}
-
-📈 **Summary**
-Open: ${openCount} | Closed: ${closedCount} | Important: ${importantCount}
-
-_Report generated at ${now.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}_`
+            const embed = {
+                title: `📊 ${reportTitle}`,
+                description: `${periodText}`,
+                color: 3447003, // Blue
+                fields: [
+                    {
+                        name: "📥 Received",
+                        value: `${currentCount} tickets (${changeText} than previous period)`,
+                        inline: false
+                    },
+                    {
+                        name: "🎮 Top Games",
+                        value: topGames.length > 0 ? topGames.join('\n') : '• No tickets received',
+                        inline: false
+                    },
+                    {
+                        name: `🚨 Important Messages (${importantCount})`,
+                        value: importantList.length > 0 ? importantList.join('\n') : '• None flagged as important',
+                        inline: false
+                    },
+                    {
+                        name: "📈 Summary",
+                        value: `Open: ${openCount} | Closed: ${closedCount} | Important: ${importantCount}`,
+                        inline: false
+                    }
+                ],
+                footer: {
+                    text: `Report generated at ${now.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' })}`
+                }
+            }
 
             await fetch(setting.webhook_url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: message })
+                body: JSON.stringify({ embeds: [embed] })
             })
         } catch (err) {
             console.error('Error sending daily report:', err)
