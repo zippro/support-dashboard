@@ -12,9 +12,7 @@ export default function TicketDetail() {
     const [ticket, setTicket] = useState<any>(null)
     const [messages, setMessages] = useState<any[]>([])
     const [newMessage, setNewMessage] = useState('')
-    const [sendEmail, setSendEmail] = useState(false)
     const [loading, setLoading] = useState(true)
-    const [emailSettings, setEmailSettings] = useState<any>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
 
     const [quickReplies, setQuickReplies] = useState<{ title: string, reply: string }[]>([])
@@ -25,17 +23,7 @@ export default function TicketDetail() {
     const [attachment, setAttachment] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
-    useEffect(() => {
-        async function fetchSettings() {
-            const { data } = await supabase
-                .from('report_settings')
-                .select('*')
-                .eq('key', 'email_reply')
-                .maybeSingle()
-            if (data) setEmailSettings(data)
-        }
-        if (isAuthenticated) fetchSettings()
-    }, [isAuthenticated])
+
 
     useEffect(() => {
         async function fetchQuickReplies() {
@@ -162,22 +150,9 @@ export default function TicketDetail() {
             attachmentUrls.push(publicUrl)
         }
 
-        // Logic to construct final message with signature if email enabled
-        // We want to KEEP the core message clean for the database (chat UI)
-        // But append signature for the EMAIL being sent out.
-        let dbContent = newMessage
-        let dbTranslatedContent = null // For DB
-
-        let emailContent = newMessage // For Email
-        let signature = ''
-
-        const agentName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Support Agent'
-
-        // Append Agent Signature if email is enabled
-        if (emailSettings?.enabled && user) {
-            signature = `\n\nBest regards,\n${agentName}`
-            emailContent += signature
-        }
+        // Logic to construct final message
+        let finalContent = newMessage
+        let translatedContent = null
 
         // Translation Logic
         if (ticket?.users?.email && newMessage.trim()) {
@@ -188,7 +163,7 @@ export default function TicketDetail() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ticket_id: id,
-                        message: newMessage, // Translation uses original message
+                        message: newMessage,
                         user_email: ticket.users.email,
                         subject: ticket.subject,
                         language: ticket.language,
@@ -202,27 +177,7 @@ export default function TicketDetail() {
                     try {
                         const data = await response.json()
                         if (data.message) {
-                            // data.message is the TRANSLATED text.
-                            // For DB: Store clean translated text
-                            dbTranslatedContent = data.message
-
-                            // For Email: Use translated text + signature (if we want signature in translated email?)
-                            // Assuming we send the translated version if translation was successful?
-                            // Logic below originally set finalContent = newMessage + signature. 
-                            // Wait, if options.translate is true, the n8n Translate Workflow returns the translated text.
-                            // The original logic replaced finalContent with newMessage + signature anyway?? 
-                            // Ah, line 192: finalContent = newMessage + signature. This implies we NEVER sent translated text to finalContent?
-                            // Line 191: translatedContent = data.message + signature.
-
-                            // CORRECTION: If translated, we should probably send the TRANSLATED text in the email? 
-                            // Or do we send original? The user usually wants to reply in the user's language.
-                            // Let's assume for EMAIL, we send the Translated version if it exists.
-                            // If `translate` is true, we send `data.message` (translated) + signature.
-                            // If `translate` is false, we send `newMessage` (original) + signature.
-
-                            if (translate) {
-                                emailContent = data.message + signature
-                            }
+                            translatedContent = data.message
                         }
                     } catch (e) {
                         console.warn('No JSON returned from webhook')
@@ -235,34 +190,12 @@ export default function TicketDetail() {
             }
         }
 
-        // EMAIL SENDING LOGIC via Custom Webhook (n8n)
-        if (emailSettings?.enabled && emailSettings?.webhook_url && ticket?.users?.email) {
-            try {
-                fetch(emailSettings.webhook_url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ticket_id: id,
-                        to_email: ticket.users.email,
-                        cc_email: user?.email,
-                        from_email: emailSettings.sender_email,
-                        subject: `Re: ${ticket.subject} [#${ticket.ticket_id}]`,
-                        message: emailContent, // Includes signature
-                        agent_name: agentName,
-                        attachments: attachmentUrls
-                    })
-                }).catch(err => console.error("Email webhook failed", err))
-            } catch (e) {
-                console.error("Error initiating email", e)
-            }
-        }
-
         const { error } = await supabase
             .from('messages')
             .insert({
                 ticket_id: id,
-                content: dbContent, // Clean message without signature
-                content_translated: dbTranslatedContent, // Clean translated message
+                content: finalContent,
+                content_translated: translatedContent,
                 sender_type: 'agent',
                 attachments: attachmentUrls
             })
