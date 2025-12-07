@@ -163,15 +163,20 @@ export default function TicketDetail() {
         }
 
         // Logic to construct final message with signature if email enabled
-        let finalContent = newMessage
-        let translatedContent = null
+        // We want to KEEP the core message clean for the database (chat UI)
+        // But append signature for the EMAIL being sent out.
+        let dbContent = newMessage
+        let dbTranslatedContent = null // For DB
+
+        let emailContent = newMessage // For Email
         let signature = ''
+
+        const agentName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Support Agent'
 
         // Append Agent Signature if email is enabled
         if (emailSettings?.enabled && user) {
-            const agentName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Support Agent'
             signature = `\n\nBest regards,\n${agentName}`
-            finalContent += signature
+            emailContent += signature
         }
 
         // Translation Logic
@@ -183,12 +188,12 @@ export default function TicketDetail() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ticket_id: id,
-                        message: newMessage, // Translation uses original message without signature usually? Or with? Usually context matters. I'll send original.
+                        message: newMessage, // Translation uses original message
                         user_email: ticket.users.email,
                         subject: ticket.subject,
                         language: ticket.language,
                         translate: true,
-                        preview_only: true,
+                        preview_only: true, // We just want the translated text
                         game_name: ticket.game_name || 'Support'
                     })
                 })
@@ -197,12 +202,27 @@ export default function TicketDetail() {
                     try {
                         const data = await response.json()
                         if (data.message) {
-                            // If translated, we want to append signature to the translated text too?
-                            // Or just keep the translation as is?
-                            // Usually signature is NOT translated or is static.
-                            // I'll append signature to final translated content if valid.
-                            translatedContent = data.message + signature // Append signature to translated text
-                            finalContent = newMessage + signature // Update finalContent to include signature
+                            // data.message is the TRANSLATED text.
+                            // For DB: Store clean translated text
+                            dbTranslatedContent = data.message
+
+                            // For Email: Use translated text + signature (if we want signature in translated email?)
+                            // Assuming we send the translated version if translation was successful?
+                            // Logic below originally set finalContent = newMessage + signature. 
+                            // Wait, if options.translate is true, the n8n Translate Workflow returns the translated text.
+                            // The original logic replaced finalContent with newMessage + signature anyway?? 
+                            // Ah, line 192: finalContent = newMessage + signature. This implies we NEVER sent translated text to finalContent?
+                            // Line 191: translatedContent = data.message + signature.
+
+                            // CORRECTION: If translated, we should probably send the TRANSLATED text in the email? 
+                            // Or do we send original? The user usually wants to reply in the user's language.
+                            // Let's assume for EMAIL, we send the Translated version if it exists.
+                            // If `translate` is true, we send `data.message` (translated) + signature.
+                            // If `translate` is false, we send `newMessage` (original) + signature.
+
+                            if (translate) {
+                                emailContent = data.message + signature
+                            }
                         }
                     } catch (e) {
                         console.warn('No JSON returned from webhook')
@@ -218,8 +238,6 @@ export default function TicketDetail() {
         // EMAIL SENDING LOGIC via Custom Webhook (n8n)
         if (emailSettings?.enabled && emailSettings?.webhook_url && ticket?.users?.email) {
             try {
-                // Don't await this to keep UI responsive, or await if critical?
-                // Better to fire and forget or show toaster.
                 fetch(emailSettings.webhook_url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -228,9 +246,9 @@ export default function TicketDetail() {
                         to_email: ticket.users.email,
                         cc_email: user?.email,
                         from_email: emailSettings.sender_email,
-                        subject: `Re: ${ticket.subject} [#${ticket.ticket_id}]`, // detailed subject
-                        message: finalContent, // Includes signature
-                        agent_name: user?.user_metadata?.full_name || 'Support Agent',
+                        subject: `Re: ${ticket.subject} [#${ticket.ticket_id}]`,
+                        message: emailContent, // Includes signature
+                        agent_name: agentName,
                         attachments: attachmentUrls
                     })
                 }).catch(err => console.error("Email webhook failed", err))
@@ -243,8 +261,8 @@ export default function TicketDetail() {
             .from('messages')
             .insert({
                 ticket_id: id,
-                content: finalContent,
-                content_translated: translatedContent,
+                content: dbContent, // Clean message without signature
+                content_translated: dbTranslatedContent, // Clean translated message
                 sender_type: 'agent',
                 attachments: attachmentUrls
             })
