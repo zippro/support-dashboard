@@ -335,7 +335,7 @@ export default function SettingsPage() {
             const importantTickets = currentTickets?.filter(t => t.importance === 'important') || []
             const importantList = importantTickets
                 .slice(0, 5)
-                .map(t => `• ${t.game_name || 'Unknown'}: "${(t.original_summary || t.subject || '').slice(0, 50)}..."`)
+                .map(t => `• [${t.game_name || 'Unknown'}: "${(t.original_summary || t.subject || '').slice(0, 50)}..."](${window.location.origin}/tickets/${t.id})`)
 
             // Counts
             const openCount = currentTickets?.filter(t => t.status === 'open').length || 0
