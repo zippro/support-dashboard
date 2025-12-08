@@ -111,7 +111,7 @@ function TicketListContent() {
             // .not('project_id', 'is', null) // We want to include nulls to detect "Unknown"
 
             if (data) {
-                const uniqueProjectIds = Array.from(new Set(data.map(t.project_id)))
+                const uniqueProjectIds = Array.from(new Set(data.map(t => t.project_id)))
 
                 const gamesList = uniqueProjectIds.map(pid => {
                     if (!pid) return { id: 'Unknown', name: 'Unknown' }
