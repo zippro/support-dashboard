@@ -38,50 +38,79 @@ export default function TicketDetail() {
     }, [])
 
     useEffect(() => {
+        let isMounted = true
+
+        // Safety timeout
+        const loadingTimeout = setTimeout(() => {
+            if (isMounted && loading) {
+                console.warn('Ticket detail: Loading timeout')
+                setLoading(false)
+            }
+        }, 15000)
+
         async function fetchTicketData() {
-            if (!id) return
-
-            // Fetch ticket details
-            const { data: ticketData, error: ticketError } = await supabase
-                .from('tickets')
-                .select('*, users(email)')
-                .eq('id', id)
-                .single()
-
-            if (ticketError) {
-                console.error('Error fetching ticket:', ticketError)
+            if (!id) {
                 setLoading(false)
                 return
             }
 
-            // Fetch Game Name if project_id exists
-            if (ticketData.project_id) {
-                const { data: projectData } = await supabase
-                    .from('projects')
-                    .select('game_name')
-                    .eq('project_id', ticketData.project_id)
+            console.log('Ticket detail: Fetching ticket', id)
+
+            try {
+                // Fetch ticket details
+                const { data: ticketData, error: ticketError } = await supabase
+                    .from('tickets')
+                    .select('*, users(email)')
+                    .eq('id', id)
                     .single()
 
-                if (projectData) {
-                    ticketData.game_name = projectData.game_name
-                } else {
-                    ticketData.game_name = ticketData.project_id
+                if (!isMounted) return
+                console.log('Ticket detail: Ticket fetched', { hasData: !!ticketData, error: ticketError?.message })
+
+                if (ticketError) {
+                    console.error('Error fetching ticket:', ticketError)
+                    setLoading(false)
+                    return
+                }
+
+                // Fetch Game Name if project_id exists
+                if (ticketData.project_id) {
+                    const { data: projectData } = await supabase
+                        .from('projects')
+                        .select('game_name')
+                        .eq('project_id', ticketData.project_id)
+                        .single()
+
+                    if (projectData) {
+                        ticketData.game_name = projectData.game_name
+                    } else {
+                        ticketData.game_name = ticketData.project_id
+                    }
+                }
+
+                if (isMounted) setTicket(ticketData)
+
+                // Fetch messages
+                const { data: messagesData, error: messagesError } = await supabase
+                    .from('messages')
+                    .select('*')
+                    .eq('ticket_id', id)
+                    .order('created_at', { ascending: true })
+
+                if (!isMounted) return
+                console.log('Ticket detail: Messages fetched', { count: messagesData?.length })
+
+                if (messagesError) console.error('Error fetching messages:', messagesError)
+                else if (isMounted) setMessages(messagesData || [])
+
+            } catch (err) {
+                console.error('Ticket detail: Fetch error', err)
+            } finally {
+                if (isMounted) {
+                    setLoading(false)
+                    console.log('Ticket detail: Loading complete')
                 }
             }
-
-            setTicket(ticketData)
-
-            // Fetch messages
-            const { data: messagesData, error: messagesError } = await supabase
-                .from('messages')
-                .select('*')
-                .eq('ticket_id', id)
-                .order('created_at', { ascending: true })
-
-            if (messagesError) console.error('Error fetching messages:', messagesError)
-            else setMessages(messagesData || [])
-
-            setLoading(false)
         }
 
         fetchTicketData()
@@ -95,6 +124,8 @@ export default function TicketDetail() {
             .subscribe()
 
         return () => {
+            isMounted = false
+            clearTimeout(loadingTimeout)
             supabase.removeChannel(channel)
         }
     }, [id])
