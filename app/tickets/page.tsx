@@ -73,7 +73,9 @@ export default function TicketList() {
 
     // Fetch projects and unique games
     useEffect(() => {
+        console.log('Tickets Page: Mounted, starting fetchData')
         async function fetchData() {
+            console.log('Tickets Page: fetchData executing...')
             // 1. Fetch Projects Map
             const { data: projects } = await publicSupabase.from('projects').select('project_id, game_name')
             const map: Record<string, string> = {}
