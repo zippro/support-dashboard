@@ -64,6 +64,7 @@ function TicketListContent() {
     // Selection State
     const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set())
     const [bulkAction, setBulkAction] = useState('')
+    const [showDeleteModal, setShowDeleteModal] = useState(false)
 
     // Refs
     const observerTarget = useRef<HTMLTableRowElement>(null)
@@ -377,16 +378,15 @@ function TicketListContent() {
         let error = null
 
         if (bulkAction === 'delete') {
-            if (!confirm(`Are you sure you want to delete ${ids.length} tickets?`)) return
-            const { error: err } = await supabase.from('tickets').delete().in('id', ids)
-            error = err
-        } else {
-            const { error: err } = await supabase
-                .from('tickets')
-                .update({ status: bulkAction })
-                .in('id', ids)
-            error = err
+            setShowDeleteModal(true)
+            return
         }
+
+        const { error: err } = await supabase
+            .from('tickets')
+            .update({ status: bulkAction })
+            .in('id', ids)
+        error = err
 
         if (!error) {
             setSelectedTickets(new Set())
@@ -395,6 +395,22 @@ function TicketListContent() {
             fetchTickets(0, true) // Refresh list
         } else {
             console.error('Bulk action error:', error)
+        }
+    }
+
+    const confirmDelete = async () => {
+        const ids = Array.from(selectedTickets)
+        const { error } = await supabase.from('tickets').delete().in('id', ids)
+
+        if (!error) {
+            setSelectedTickets(new Set())
+            setBulkAction('')
+            setShowDeleteModal(false)
+            setPage(0)
+            fetchTickets(0, true)
+        } else {
+            console.error('Delete error:', error)
+            alert('Failed to delete tickets') // Fallback alert
         }
     }
 
@@ -772,6 +788,37 @@ function TicketListContent() {
                                 <Link href="/login" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-center">
                                     Sign In
                                 </Link>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-800 animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                        <div className="text-center">
+                            <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
+                                <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete {selectedTickets.size} Tickets?</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                                This action cannot be undone. These tickets will be permanently removed.
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowDeleteModal(false)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmDelete}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm hover:shadow"
+                                >
+                                    Delete
+                                </button>
                             </div>
                         </div>
                     </div>
