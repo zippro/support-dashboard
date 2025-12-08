@@ -49,6 +49,7 @@ export default function TicketList() {
     // Filter State
     const [statusFilter, setStatusFilter] = useState('all')
     const [gameFilter, setGameFilter] = useState<string[]>([])
+    const [gamesLoaded, setGamesLoaded] = useState(false)
     const [availableGames, setAvailableGames] = useState<{ id: string, name: string }[]>([])
     const [projectsMap, setProjectsMap] = useState<Record<string, string>>({})
     const [dateFilter, setDateFilter] = useState('all')
@@ -134,6 +135,7 @@ export default function TicketList() {
                 setAvailableGames(uniqueGames)
                 setGameFilter(uniqueGames.map(g => g.id)) // Default Select All
             }
+            setGamesLoaded(true)
         }
         fetchData()
     }, [])
@@ -305,11 +307,12 @@ export default function TicketList() {
         }
     }, [statusFilter, gameFilter, dateFilter, customStartDate, customEndDate, availableGames, debouncedSearch, importanceFilter])
 
-    // Initial Fetch & Filter Changes
+    // Initial Fetch & Filter Changes - only run after games are loaded
     useEffect(() => {
+        if (!gamesLoaded) return // Wait for games to load first
         setPage(0)
         fetchTickets(0, true)
-    }, [fetchTickets])
+    }, [fetchTickets, gamesLoaded])
 
     // Infinite Scroll Observer
     useEffect(() => {
