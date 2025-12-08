@@ -7,6 +7,7 @@ import { Home, Inbox, Settings, BarChart2, LogIn, LogOut, User } from 'lucide-re
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
 
 const navigation = [
@@ -26,7 +27,7 @@ export function Sidebar() {
         if (pathname === '/login' || pathname === '/register') return
 
         async function fetchOpenTicketCount() {
-            const { count, error } = await supabase
+            const { count, error } = await publicSupabase
                 .from('tickets')
                 .select('id', { count: 'exact', head: true })
                 .eq('status', 'open')
