@@ -32,19 +32,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true)
 
     useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session)
-            setUser(session?.user ?? null)
-            if (session?.user) {
-                fetchProfile(session.user.id)
-            } else {
+        let mounted = true
+
+        // Safety timeout - if auth takes more than 10 seconds, proceed anyway
+        const timeout = setTimeout(() => {
+            if (mounted && isLoading) {
+                console.warn('Auth timeout - proceeding without session')
                 setIsLoading(false)
             }
-        })
+        }, 10000)
+
+        // Get initial session
+        supabase.auth.getSession()
+            .then(({ data: { session } }) => {
+                if (!mounted) return
+                setSession(session)
+                setUser(session?.user ?? null)
+                if (session?.user) {
+                    fetchProfile(session.user.id)
+                } else {
+                    setIsLoading(false)
+                }
+            })
+            .catch((err) => {
+                console.error('Error getting session:', err)
+                if (mounted) setIsLoading(false)
+            })
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (!mounted) return
             setSession(session)
             setUser(session?.user ?? null)
             if (session?.user) {
@@ -55,7 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsLoading(false)
         })
 
-        return () => subscription.unsubscribe()
+        return () => {
+            mounted = false
+            clearTimeout(timeout)
+            subscription.unsubscribe()
+        }
     }, [])
 
     async function fetchProfile(userId: string) {
