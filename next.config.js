@@ -3,6 +3,15 @@ const nextConfig = {
     generateBuildId: async () => {
         return `build-${Date.now()}`
     },
+    images: {
+        remotePatterns: [
+            {
+                protocol: 'https',
+                hostname: 'jpxkomdyuvouijhvbibq.supabase.co',
+                pathname: '/storage/**',
+            },
+        ],
+    },
     headers: async () => {
         return [
             {
