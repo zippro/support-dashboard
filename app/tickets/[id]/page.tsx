@@ -8,7 +8,7 @@ import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle,
 
 export default function TicketDetail() {
     const { id } = useParams()
-    const { isAuthenticated, user } = useAuth()
+    const { isAuthenticated, user, profile } = useAuth()
     const [ticket, setTicket] = useState<any>(null)
     const [messages, setMessages] = useState<any[]>([])
     const [newMessage, setNewMessage] = useState('')
@@ -165,6 +165,7 @@ export default function TicketDetail() {
                         ticket_id: id,
                         message: newMessage,
                         user_email: ticket.users.email,
+                        agent_email: profile?.email || user?.email || '',
                         subject: ticket.subject,
                         language: ticket.language,
                         translate: true,
@@ -497,6 +498,7 @@ export default function TicketDetail() {
                                                         ticket_id: id,
                                                         message: newMessage,
                                                         user_email: ticket.users.email,
+                                                        agent_email: profile?.email || user?.email || '',
                                                         subject: ticket.subject,
                                                         language: ticket.language,
                                                         translate: true,
