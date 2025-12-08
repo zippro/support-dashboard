@@ -1,7 +1,7 @@
-// Force rebuild: 2024-12-08T21:35:00
+// Force rebuild: 2024-12-08T23:55:00
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { useEffect, useState, useRef, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { publicSupabase } from '@/lib/supabase-public'
@@ -35,7 +35,7 @@ const DATE_RANGES = [
     { label: 'Custom', value: 'custom' },
 ]
 
-export default function TicketList() {
+function TicketListContent() {
     // Data State
     const [tickets, setTickets] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
@@ -111,7 +111,7 @@ export default function TicketList() {
             // .not('project_id', 'is', null) // We want to include nulls to detect "Unknown"
 
             if (data) {
-                const uniqueProjectIds = Array.from(new Set(data.map(t => t.project_id)))
+                const uniqueProjectIds = Array.from(new Set(data.map(t.project_id)))
 
                 const gamesList = uniqueProjectIds.map(pid => {
                     if (!pid) return { id: 'Unknown', name: 'Unknown' }
@@ -778,5 +778,18 @@ export default function TicketList() {
                 </div>
             )}
         </div>
+    )
+}
+
+export default function TicketList() {
+    return (
+        <Suspense fallback={
+            <div className="h-full flex flex-col items-center justify-center p-6 bg-gray-50 dark:bg-gray-950">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent"></div>
+                <p className="mt-4 text-gray-500 dark:text-gray-400">Loading tickets...</p>
+            </div>
+        }>
+            <TicketListContent />
+        </Suspense>
     )
 }
