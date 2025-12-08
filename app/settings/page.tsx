@@ -361,6 +361,7 @@ export default function SettingsPage() {
 
             const embed = {
                 title: `📊 ${reportTitle}`,
+                url: window.location.origin,
                 description: `${periodText}`,
                 color: 3447003, // Blue
                 fields: [
