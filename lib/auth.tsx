@@ -163,7 +163,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any
 
-            if (!error && data?.user) {
+            if (!error && data?.user && data?.session) {
+                // Manually update state to avoid race conditions
+                setSession(data.session)
+                setUser(data.user)
+
                 // Store email on successful login
                 setAgentEmail(email)
                 setStoredAgentEmail(email)
