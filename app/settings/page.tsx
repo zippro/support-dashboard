@@ -154,11 +154,14 @@ export default function SettingsPage() {
 
         setTestingAlert(true)
         try {
-            await fetch(webhookUrl, {
+            await fetch('/api/proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    content: '🔔 **Test Alert** - Your alert system is working correctly!'
+                    url: webhookUrl,
+                    body: {
+                        content: '🔔 **Test Alert** - Your alert system is working correctly!'
+                    }
                 })
             })
         } catch (err) {
@@ -249,19 +252,25 @@ export default function SettingsPage() {
 
             // Send alerts to Discord
             if (alerts.length > 0) {
-                await fetch(webhookUrl, {
+                await fetch('/api/proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        content: alerts.join('\n\n')
+                        url: webhookUrl,
+                        body: {
+                            content: alerts.join('\n\n')
+                        }
                     })
                 })
             } else {
-                await fetch(webhookUrl, {
+                await fetch('/api/proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        content: '✅ No alerts triggered - ticket counts are within normal range.'
+                        url: webhookUrl,
+                        body: {
+                            content: '✅ No alerts triggered - ticket counts are within normal range.'
+                        }
                     })
                 })
             }
@@ -381,10 +390,13 @@ export default function SettingsPage() {
                 }
             }
 
-            await fetch(setting.webhook_url, {
+            await fetch('/api/proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ embeds: [embed] })
+                body: JSON.stringify({
+                    url: setting.webhook_url,
+                    body: { embeds: [embed] }
+                })
             })
         } catch (err) {
             console.error('Error sending daily report:', err)
