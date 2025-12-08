@@ -146,6 +146,16 @@ export default function TicketList() {
                 .select('*, users(email)', { count: 'exact' })
                 .order('created_at', { ascending: false })
 
+            console.log('fetchTickets running:', {
+                pageNum,
+                isNewFilter,
+                dateFilter,
+                statusFilter,
+                gameFilter: gameFilter.length,
+                availableGames: availableGames.length,
+                debouncedSearch
+            })
+
             // Apply Search
             if (debouncedSearch) {
                 const isNumber = !isNaN(Number(debouncedSearch))
