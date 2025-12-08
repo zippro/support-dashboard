@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { Clock, CheckCircle, AlertCircle, Inbox, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ArrowUp, ArrowDown } from 'lucide-react'
+import { publicSupabase } from '@/lib/supabase-public'
+import { useAuth } from '@/lib/auth'
+import { ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, MessageSquare, AlertTriangle, TrendingUp, Users, Activity } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -14,12 +16,10 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell,
-  AreaChart,
-  Area
+  Cell
 } from 'recharts'
 
-const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899']
+const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8B5CF6', '#EC4899']
 const SENTIMENT_EMOJIS = { Positive: '😊', Neutral: '😐', Negative: '😟', Angry: '😡' }
 
 type GamePeriod = 'today' | 'yesterday' | 'week' | 'month' | 'all'
@@ -100,7 +100,7 @@ export default function Dashboard() {
         const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
         console.log('Dashboard: Fetching tickets...')
-        const { data: tickets, error: ticketsError } = await supabase.from('tickets').select('status, project_id, created_at, sentiment, importance, tags').order('created_at', { ascending: true })
+        const { data: tickets, error: ticketsError } = await publicSupabase.from('tickets').select('status, project_id, created_at, sentiment, importance, tags').order('created_at', { ascending: true })
 
         if (!isMounted) return
         console.log('Dashboard: Tickets fetched:', tickets?.length || 0, ticketsError ? `Error: ${ticketsError.message}` : '')
@@ -108,7 +108,7 @@ export default function Dashboard() {
         if (ticketsError) throw ticketsError
 
         console.log('Dashboard: Fetching projects...')
-        const { data: projects, error: projectsError } = await supabase.from('projects').select('project_id, game_name')
+        const { data: projects, error: projectsError } = await publicSupabase.from('projects').select('project_id, game_name')
 
         if (!isMounted) return
         console.log('Dashboard: Projects fetched:', projects?.length || 0, projectsError ? `Error: ${projectsError.message}` : '')

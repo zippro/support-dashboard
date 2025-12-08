@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
 import Link from 'next/link'
 import {
@@ -74,7 +75,7 @@ export default function TicketList() {
     useEffect(() => {
         async function fetchData() {
             // 1. Fetch Projects Map
-            const { data: projects } = await supabase.from('projects').select('project_id, game_name')
+            const { data: projects } = await publicSupabase.from('projects').select('project_id, game_name')
             const map: Record<string, string> = {}
             if (projects) {
                 projects.forEach(p => {
@@ -84,7 +85,7 @@ export default function TicketList() {
             setProjectsMap(map)
 
             // 2. Fetch Unique Project IDs from Tickets
-            const { data } = await supabase
+            const { data } = await publicSupabase
                 .from('tickets')
                 .select('project_id')
             // .not('project_id', 'is', null) // We want to include nulls to detect "Unknown"
@@ -128,7 +129,7 @@ export default function TicketList() {
                 setLoadingMore(true)
             }
 
-            let query = supabase
+            let query = publicSupabase
                 .from('tickets')
                 .select('*, users(email)', { count: 'exact' })
                 .order('created_at', { ascending: false })

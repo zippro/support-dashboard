@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
 import { useParams } from 'next/navigation'
 import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle, Lock } from 'lucide-react'
@@ -58,7 +59,7 @@ export default function TicketDetail() {
 
             try {
                 // Fetch ticket details
-                const { data: ticketData, error: ticketError } = await supabase
+                const { data: ticketData, error: ticketError } = await publicSupabase
                     .from('tickets')
                     .select('*, users(email)')
                     .eq('id', id)
@@ -75,7 +76,7 @@ export default function TicketDetail() {
 
                 // Fetch Game Name if project_id exists
                 if (ticketData.project_id) {
-                    const { data: projectData } = await supabase
+                    const { data: projectData } = await publicSupabase
                         .from('projects')
                         .select('game_name')
                         .eq('project_id', ticketData.project_id)
@@ -91,7 +92,7 @@ export default function TicketDetail() {
                 if (isMounted) setTicket(ticketData)
 
                 // Fetch messages
-                const { data: messagesData, error: messagesError } = await supabase
+                const { data: messagesData, error: messagesError } = await publicSupabase
                     .from('messages')
                     .select('*')
                     .eq('ticket_id', id)
