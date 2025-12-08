@@ -20,12 +20,14 @@ export const publicSupabase = createClient(supabaseUrl, supabaseAnonKey, {
             'x-client-info': 'narcade-public-client',
         },
         fetch: (url, options) => {
+            const controller = new AbortController()
+            const id = setTimeout(() => controller.abort(), 15000)
+
             return fetch(url, {
                 ...options,
-                // Add a reasonable timeout to native fetch
-                signal: AbortSignal.timeout(15000),
+                signal: controller.signal,
                 cache: 'no-store'
-            })
+            }).finally(() => clearTimeout(id))
         }
     },
 })
