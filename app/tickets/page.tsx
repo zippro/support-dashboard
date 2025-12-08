@@ -121,6 +121,18 @@ export default function TicketList() {
 
     // Main Fetch Function
     const fetchTickets = useCallback(async (pageNum: number, isNewFilter = false) => {
+        // Safety: Ensure we don't fetch if already loading same page
+        // But allow if it's a new filter
+
+        let isMounted = true
+        const timeoutId = setTimeout(() => {
+            if (isMounted) {
+                console.warn('Fetch timeout - forcing stop')
+                setLoading(false)
+                setLoadingMore(false)
+            }
+        }, 15000)
+
         try {
             if (isNewFilter) {
                 setLoading(true)
@@ -148,7 +160,7 @@ export default function TicketList() {
                 // Since we used !inner join above, we can filter by users.email directly if Supabase supports it in 'or'
                 // But 'or' across tables is tricky.
                 // Alternative: Fetch matching user IDs first.
-                const { data: users } = await supabase.from('users').select('id').ilike('email', `%${debouncedSearch}%`)
+                const { data: users } = await publicSupabase.from('users').select('id').ilike('email', `%${debouncedSearch}%`)
                 if (users && users.length > 0) {
                     const userIds = users.map(u => u.id).join(',')
                     conditions.push(`user_id.in.(${userIds})`)
@@ -238,7 +250,7 @@ export default function TicketList() {
 
             if (error) throw error
 
-            if (data) {
+            if (isMounted && data) {
                 setTickets(prev => isNewFilter ? data : [...prev, ...data])
                 setTotalCount(count || 0)
                 setHasMore(data.length === ITEMS_PER_PAGE)
@@ -250,8 +262,12 @@ export default function TicketList() {
                 console.error('Error details:', JSON.stringify(error, null, 2))
             }
         } finally {
-            setLoading(false)
-            setLoadingMore(false)
+            if (isMounted) {
+                clearTimeout(timeoutId)
+                setLoading(false)
+                setLoadingMore(false)
+            }
+            isMounted = false
         }
     }, [statusFilter, gameFilter, dateFilter, customStartDate, customEndDate, availableGames, debouncedSearch])
 
