@@ -81,17 +81,38 @@ export default function Dashboard() {
   }
 
   useEffect(() => {
+    let isMounted = true
+
+    // Safety timeout - always stop loading after 15 seconds
+    const loadingTimeout = setTimeout(() => {
+      if (isMounted) {
+        console.warn('Dashboard loading timeout - forcing loading to false')
+        setLoading(false)
+      }
+    }, 15000)
+
     async function fetchStats() {
+      console.log('Dashboard: Starting fetchStats...')
       try {
         const now = new Date()
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
         const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000)
         const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
+        console.log('Dashboard: Fetching tickets...')
         const { data: tickets, error: ticketsError } = await supabase.from('tickets').select('status, project_id, created_at, sentiment, importance, tags').order('created_at', { ascending: true })
+
+        if (!isMounted) return
+        console.log('Dashboard: Tickets fetched:', tickets?.length || 0, ticketsError ? `Error: ${ticketsError.message}` : '')
+
         if (ticketsError) throw ticketsError
 
+        console.log('Dashboard: Fetching projects...')
         const { data: projects, error: projectsError } = await supabase.from('projects').select('project_id, game_name')
+
+        if (!isMounted) return
+        console.log('Dashboard: Projects fetched:', projects?.length || 0, projectsError ? `Error: ${projectsError.message}` : '')
+
         if (projectsError) throw projectsError
 
         const pMap: Record<string, string> = {}
@@ -139,15 +160,23 @@ export default function Dashboard() {
           if (newInsights.length === 0) newInsights.push({ icon: CheckCircle, message: 'All good!', color: 'text-green-500' })
           setInsights(newInsights)
         }
+        console.log('Dashboard: Data processing complete')
       } catch (error) {
         console.error('Error fetching dashboard stats:', error)
       } finally {
-        setLoading(false)
+        console.log('Dashboard: Setting loading to false')
+        if (isMounted) setLoading(false)
       }
     }
+
     fetchStats()
     const channel = supabase.channel('dashboard').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, () => fetchStats()).subscribe()
-    return () => { supabase.removeChannel(channel) }
+
+    return () => {
+      isMounted = false
+      clearTimeout(loadingTimeout)
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => { if (allTickets.length > 0) setGameStats(computeGameStats(allTickets, gamePeriod, projectMap)) }, [gamePeriod, allTickets, projectMap])
