@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
 import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send, FileText, Calendar, Mail } from 'lucide-react'
 
@@ -102,7 +103,7 @@ export default function SettingsPage() {
 
     async function fetchTags() {
         try {
-            const { data, error } = await supabase.from('tag_definitions').select('*').order('created_at', { ascending: false })
+            const { data, error } = await publicSupabase.from('tag_definitions').select('*').order('created_at', { ascending: false })
             if (error) throw error
             setTags(data || [])
         } catch (err) {
@@ -112,7 +113,7 @@ export default function SettingsPage() {
 
     async function fetchImportanceSettings() {
         try {
-            const { data, error } = await supabase.from('importance_settings').select('*').single()
+            const { data, error } = await publicSupabase.from('importance_settings').select('*').single()
             if (error && error.code !== 'PGRST116') throw error
             if (data) {
                 setImportanceSettings(data)
@@ -126,7 +127,7 @@ export default function SettingsPage() {
 
     async function fetchAlertSettings() {
         try {
-            const { data, error } = await supabase.from('alert_settings').select('*')
+            const { data, error } = await publicSupabase.from('alert_settings').select('*')
             if (error) throw error
             setAlertSettings(data || [])
         } catch (err) {
@@ -273,7 +274,7 @@ export default function SettingsPage() {
 
     async function fetchReportSettings() {
         try {
-            const { data, error } = await supabase.from('report_settings').select('*')
+            const { data, error } = await publicSupabase.from('report_settings').select('*')
             if (error) throw error
             setReportSettings(data || [])
         } catch (err) {
@@ -457,7 +458,7 @@ export default function SettingsPage() {
 
     async function fetchQuickReplies() {
         try {
-            const { data, error } = await supabase.from('quick_replies').select('*').order('created_at', { ascending: false })
+            const { data, error } = await publicSupabase.from('quick_replies').select('*').order('created_at', { ascending: false })
             if (error) throw error
             setQuickReplies(data || [])
         } catch (err: any) {
@@ -507,7 +508,7 @@ export default function SettingsPage() {
     async function fetchProjects() {
         try {
             setLoading(true)
-            const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false })
+            const { data, error } = await publicSupabase.from('projects').select('*').order('created_at', { ascending: false })
             if (error) throw error
             setProjects(data || [])
         } catch (err: any) {
