@@ -99,10 +99,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     async function signOut() {
-        await supabase.auth.signOut()
-        setUser(null)
-        setProfile(null)
-        setSession(null)
+        try {
+            await supabase.auth.signOut()
+            setUser(null)
+            setProfile(null)
+            setSession(null)
+            // Force redirect to login page
+            window.location.href = '/login'
+        } catch (error) {
+            console.error('Error signing out:', error)
+            // Force redirect anyway
+            window.location.href = '/login'
+        }
     }
 
     async function updateProfile(updates: Partial<AgentProfile>) {

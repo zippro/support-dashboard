@@ -256,9 +256,11 @@ export default function TicketList() {
 
     // Initial Fetch & Filter Changes
     useEffect(() => {
+        // Only fetch when we have available games loaded
+        if (availableGames.length === 0) return
         setPage(0)
         fetchTickets(0, true)
-    }, [fetchTickets])
+    }, [fetchTickets, availableGames.length])
 
     // Infinite Scroll Observer
     useEffect(() => {
