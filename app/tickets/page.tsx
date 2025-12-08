@@ -49,7 +49,7 @@ export default function TicketList() {
     const [gameFilter, setGameFilter] = useState<string[]>([])
     const [availableGames, setAvailableGames] = useState<{ id: string, name: string }[]>([])
     const [projectsMap, setProjectsMap] = useState<Record<string, string>>({})
-    const [dateFilter, setDateFilter] = useState('3days')
+    const [dateFilter, setDateFilter] = useState('all')
     const [customStartDate, setCustomStartDate] = useState('')
     const [customEndDate, setCustomEndDate] = useState('')
     const [showGameDropdown, setShowGameDropdown] = useState(false)
