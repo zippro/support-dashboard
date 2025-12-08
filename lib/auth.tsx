@@ -29,52 +29,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null)
     const [profile, setProfile] = useState<AgentProfile | null>(null)
     const [session, setSession] = useState<Session | null>(null)
-    const [isLoading, setIsLoading] = useState(true)
+    const [isLoading, setIsLoading] = useState(false) // Start with false so pages can render immediately
 
     useEffect(() => {
         let mounted = true
 
-        // Safety timeout - if auth takes more than 10 seconds, proceed anyway
-        const timeout = setTimeout(() => {
-            if (mounted && isLoading) {
-                console.warn('Auth timeout - proceeding without session')
-                setIsLoading(false)
-            }
-        }, 10000)
-
-        // Get initial session
-        supabase.auth.getSession()
-            .then(({ data: { session } }) => {
+        // Get initial session without blocking
+        const initAuth = async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession()
                 if (!mounted) return
+
+                if (error) {
+                    console.error('Auth error:', error)
+                    return
+                }
+
                 setSession(session)
                 setUser(session?.user ?? null)
+
                 if (session?.user) {
-                    fetchProfile(session.user.id)
-                } else {
-                    setIsLoading(false)
+                    // Fetch profile in background
+                    try {
+                        const { data } = await supabase
+                            .from('agent_profiles')
+                            .select('*')
+                            .eq('id', session.user.id)
+                            .single()
+
+                        if (mounted && data) {
+                            setProfile(data)
+                        }
+                    } catch (err) {
+                        console.error('Profile fetch error:', err)
+                    }
                 }
-            })
-            .catch((err) => {
-                console.error('Error getting session:', err)
-                if (mounted) setIsLoading(false)
-            })
+            } catch (err) {
+                console.error('Session error:', err)
+            }
+        }
+
+        initAuth()
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!mounted) return
             setSession(session)
             setUser(session?.user ?? null)
+
             if (session?.user) {
-                await fetchProfile(session.user.id)
+                try {
+                    const { data } = await supabase
+                        .from('agent_profiles')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .single()
+
+                    if (mounted && data) {
+                        setProfile(data)
+                    }
+                } catch (err) {
+                    console.error('Profile fetch error:', err)
+                }
             } else {
                 setProfile(null)
             }
-            setIsLoading(false)
         })
 
         return () => {
             mounted = false
-            clearTimeout(timeout)
             subscription.unsubscribe()
         }
     }, [])
