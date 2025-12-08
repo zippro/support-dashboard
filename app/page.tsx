@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { Clock, CheckCircle, AlertCircle, Inbox, TrendingUp, TrendingDown, Minus, AlertTriangle, Sparkles, ArrowUp, ArrowDown } from 'lucide-react'
 import {
@@ -23,11 +24,11 @@ const SENTIMENT_EMOJIS = { Positive: '😊', Neutral: '😐', Negative: '😟', 
 
 type GamePeriod = 'today' | 'yesterday' | 'week' | 'month' | 'all'
 
-function StatCard({ title, value, icon: Icon, color, trend, trendLabel, subtext }: any) {
+function StatCard({ title, value, icon: Icon, color, trend, trendLabel, subtext, href }: any) {
   const isPositive = trend > 0
   const isNeutral = trend === 0
-  return (
-    <div className="rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900 hover:shadow-md transition-all">
+  const content = (
+    <div className={`rounded-xl border bg-white p-6 shadow-sm dark:bg-gray-900 hover:shadow-md transition-all ${href ? 'cursor-pointer hover:border-indigo-300 dark:hover:border-indigo-700' : ''}`}>
       <div className="flex items-center justify-between mb-4">
         <div className={`rounded-full p-3 ${color} bg-opacity-10`}>
           <Icon className={`h-6 w-6 ${color.replace('bg-', 'text-')}`} />
@@ -44,6 +45,7 @@ function StatCard({ title, value, icon: Icon, color, trend, trendLabel, subtext 
       {(trendLabel || subtext) && <p className="text-xs text-gray-400 mt-2">{trendLabel || subtext}</p>}
     </div>
   )
+  return href ? <Link href={href}>{content}</Link> : content
 }
 
 export default function Dashboard() {
@@ -131,7 +133,7 @@ export default function Dashboard() {
           const angryToday = todayTickets.filter(t => t.sentiment === 'Angry').length
           if (angryToday > 0) newInsights.push({ icon: AlertTriangle, message: `${angryToday} angry customer${angryToday > 1 ? 's' : ''} today!`, color: 'text-red-500' })
           const importantOpen = tickets.filter(t => t.importance === 'important' && t.status === 'open').length
-          if (importantOpen > 0) newInsights.push({ icon: AlertCircle, message: `${importantOpen} important open`, color: 'text-red-500' })
+          if (importantOpen > 0) newInsights.push({ icon: AlertCircle, message: `${importantOpen} important open`, color: 'text-red-500', href: '/tickets?importance=important&status=open' })
           const resolutionRate = total > 0 ? Math.round((closed / total) * 100) : 0
           if (resolutionRate > 80) newInsights.push({ icon: CheckCircle, message: `${resolutionRate}% resolved!`, color: 'text-green-500' })
           if (newInsights.length === 0) newInsights.push({ icon: CheckCircle, message: 'All good!', color: 'text-green-500' })
@@ -171,16 +173,27 @@ export default function Dashboard() {
       <div className="rounded-xl border bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 p-4 dark:border-gray-800">
         <div className="flex items-center gap-2 mb-3"><Sparkles className="w-5 h-5 text-indigo-500" /><h3 className="font-semibold text-gray-900 dark:text-white">Insights</h3></div>
         <div className="flex flex-wrap gap-3">
-          {insights.map((insight, i) => (<div key={i} className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-lg border dark:border-gray-800 shadow-sm"><insight.icon className={`w-4 h-4 ${insight.color}`} /><span className="text-sm text-gray-700 dark:text-gray-300">{insight.message}</span></div>))}
+          {insights.map((insight, i) => (
+            insight.href ? (
+              <Link key={i} href={insight.href} className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-lg border dark:border-gray-800 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors cursor-pointer">
+                <insight.icon className={`w-4 h-4 ${insight.color}`} />
+                <span className="text-sm text-gray-700 dark:text-gray-300">{insight.message}</span>
+              </Link>
+            ) : (
+              <div key={i} className="flex items-center gap-2 bg-white dark:bg-gray-900 px-3 py-2 rounded-lg border dark:border-gray-800 shadow-sm">
+                <insight.icon className={`w-4 h-4 ${insight.color}`} />
+                <span className="text-sm text-gray-700 dark:text-gray-300">{insight.message}</span>
+              </div>
+            )
+          ))}
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total Tickets" value={stats.total} icon={Inbox} color="bg-indigo-500" trend={stats.totalTrend} trendLabel="vs. yesterday" />
-        <StatCard title="Open Tickets" value={stats.open} icon={AlertCircle} color="bg-red-500" trend={stats.openTrend} trendLabel="vs. yesterday" />
-        <StatCard title="Important" value={stats.important} icon={AlertTriangle} color="bg-orange-500" subtext="Needs attention" />
-        <StatCard title="Resolved" value={stats.closed} icon={CheckCircle} color="bg-green-500" subtext="Successfully closed" />
+        <StatCard title="Total Tickets" value={stats.total} icon={Inbox} color="bg-indigo-500" trend={stats.totalTrend} trendLabel="vs. yesterday" href="/tickets" />
+        <StatCard title="Open Tickets" value={stats.open} icon={AlertCircle} color="bg-red-500" trend={stats.openTrend} trendLabel="vs. yesterday" href="/tickets?status=open" />
+        <StatCard title="Important" value={stats.important} icon={AlertTriangle} color="bg-orange-500" subtext="Needs attention" href="/tickets?importance=important" />
+        <StatCard title="Resolved" value={stats.closed} icon={CheckCircle} color="bg-green-500" subtext="Successfully closed" href="/tickets?status=closed" />
       </div>
 
       {/* Row 1: Games + Weekly Volume */}
