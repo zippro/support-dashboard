@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
@@ -56,6 +57,8 @@ export default function TicketList() {
     const [showGameDropdown, setShowGameDropdown] = useState(false)
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
+    const [importanceFilter, setImportanceFilter] = useState<string | null>(null)
+    const searchParams = useSearchParams()
 
     // Selection State
     const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set())
@@ -71,6 +74,19 @@ export default function TicketList() {
         }, 500)
         return () => clearTimeout(timer)
     }, [searchQuery])
+
+    // Read URL query parameters on mount
+    useEffect(() => {
+        const urlStatus = searchParams.get('status')
+        const urlImportance = searchParams.get('importance')
+
+        if (urlStatus) {
+            setStatusFilter(urlStatus)
+        }
+        if (urlImportance === 'important') {
+            setImportanceFilter('important')
+        }
+    }, [searchParams])
 
     // Fetch projects and unique games
     useEffect(() => {
@@ -187,6 +203,11 @@ export default function TicketList() {
                 query = query.eq('status', statusFilter)
             }
 
+            // Apply Importance Filter
+            if (importanceFilter === 'important') {
+                query = query.eq('importance', 'important')
+            }
+
             // Apply Game Filter - only if games have been loaded and filter has been set
             if (availableGames.length > 0 && gameFilter.length > 0) {
                 const includeUnknown = gameFilter.includes('Unknown')
@@ -282,7 +303,7 @@ export default function TicketList() {
             }
             isMounted = false
         }
-    }, [statusFilter, gameFilter, dateFilter, customStartDate, customEndDate, availableGames, debouncedSearch])
+    }, [statusFilter, gameFilter, dateFilter, customStartDate, customEndDate, availableGames, debouncedSearch, importanceFilter])
 
     // Initial Fetch & Filter Changes
     useEffect(() => {
