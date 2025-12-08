@@ -157,6 +157,11 @@ export default function TicketDetail() {
         // Translation Logic
         if (ticket?.users?.email && newMessage.trim()) {
             if (translate) setIsTranslating(true)
+
+            // Get agent email with multiple fallbacks
+            const agentEmail = profile?.email || user?.email || ''
+            console.log('Agent email being sent:', agentEmail, 'Profile:', profile, 'User:', user)
+
             try {
                 const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
                     method: 'POST',
@@ -165,7 +170,7 @@ export default function TicketDetail() {
                         ticket_id: id,
                         message: newMessage,
                         user_email: ticket.users.email,
-                        agent_email: profile?.email || user?.email || '',
+                        agent_email: agentEmail,
                         subject: ticket.subject,
                         language: ticket.language,
                         translate: true,
