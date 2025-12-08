@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
-import { ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, MessageSquare, AlertTriangle, TrendingUp, Users, Activity } from 'lucide-react'
+import { ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, MessageSquare, AlertTriangle, TrendingUp, Users, Activity, Sparkles } from 'lucide-react'
 import {
   BarChart,
   Bar,
