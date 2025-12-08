@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { publicSupabase } from '@/lib/supabase-public'
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
@@ -48,13 +48,13 @@ export default function AnalyticsPage() {
             setLoading(true)
             const startDate = getDateFilter()
 
-            const { data: tickets } = await supabase
+            const { data: tickets } = await publicSupabase
                 .from('tickets')
                 .select('*')
                 .gte('created_at', startDate.toISOString())
                 .order('created_at', { ascending: true })
 
-            const { data: projects } = await supabase.from('projects').select('project_id, game_name')
+            const { data: projects } = await publicSupabase.from('projects').select('project_id, game_name')
             const projectMap: Record<string, string> = {}
             projects?.forEach(p => projectMap[p.project_id] = p.game_name)
 
@@ -162,8 +162,8 @@ export default function AnalyticsPage() {
                             key={t}
                             onClick={() => setTab(t)}
                             className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${tab === t
-                                    ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-md'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-700/50'
+                                ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-white shadow-md'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-700/50'
                                 }`}
                         >
                             {t === 'overview' ? '📊 Overview' : t === 'efficiency' ? '⚡ Efficiency' : '📈 Trends'}
