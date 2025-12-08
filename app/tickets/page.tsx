@@ -130,7 +130,7 @@ export default function TicketList() {
 
             let query = supabase
                 .from('tickets')
-                .select('*, users!inner(email)', { count: 'exact' })
+                .select('*, users(email)', { count: 'exact' })
                 .order('created_at', { ascending: false })
 
             // Apply Search
@@ -161,25 +161,25 @@ export default function TicketList() {
                 query = query.eq('status', statusFilter)
             }
 
-            // Apply Game Filter
-            const includeUnknown = gameFilter.includes('Unknown')
-            const realProjectIds = gameFilter.filter(g => g !== 'Unknown')
+            // Apply Game Filter - only if games have been loaded and filter has been set
+            if (availableGames.length > 0 && gameFilter.length > 0) {
+                const includeUnknown = gameFilter.includes('Unknown')
+                const realProjectIds = gameFilter.filter(g => g !== 'Unknown')
 
-            if (gameFilter.length === 0) {
-                // If no games are selected (user deselected all), show nothing
-                query = query.in('project_id', ['__NO_GAME__'])
-            } else if (includeUnknown && realProjectIds.length > 0) {
-                // If 'Unknown' and other games are selected
-                const idsString = realProjectIds.map(g => `"${g}"`).join(',')
-                // Include NULL and Empty String for Unknown
-                query = query.or(`project_id.in.(${idsString}),project_id.is.null,project_id.eq.""`)
-            } else if (includeUnknown) {
-                // If only 'Unknown' is selected
-                query = query.or('project_id.is.null,project_id.eq.""')
-            } else if (realProjectIds.length > 0) {
-                // If only specific games (no 'Unknown') are selected
-                query = query.in('project_id', realProjectIds)
+                if (includeUnknown && realProjectIds.length > 0) {
+                    // If 'Unknown' and other games are selected
+                    const idsString = realProjectIds.map(g => `"${g}"`).join(',')
+                    query = query.or(`project_id.in.(${idsString}),project_id.is.null,project_id.eq.""`)
+                } else if (includeUnknown) {
+                    // If only 'Unknown' is selected
+                    query = query.or('project_id.is.null,project_id.eq.""')
+                } else if (realProjectIds.length > 0) {
+                    // If only specific games (no 'Unknown') are selected
+                    query = query.in('project_id', realProjectIds)
+                }
             }
+            // If gameFilter is empty but we have available games, show nothing (user deselected all)
+            // If availableGames is empty, don't filter by game at all (show all tickets)
 
             // Apply Date Filter
             const now = new Date()
