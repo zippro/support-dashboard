@@ -199,14 +199,15 @@ export default function TicketDetail() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ticket_id: id,
-                        message: newMessage,
+                        message: newMessage + (attachmentUrls.length > 0 ? `\n\nAttachments:\n${attachmentUrls.join('\n')}` : ''),
                         user_email: ticket.users.email,
                         agent_email: agentEmail || 'support@narcade.com', // Fallback to support email
                         subject: ticket.subject,
                         language: ticket.language,
                         translate: true,
                         preview_only: true, // We just want the translated text
-                        game_name: ticket.game_name || 'Support'
+                        game_name: ticket.game_name || 'Support',
+                        attachments: attachmentUrls
                     })
                 })
 
