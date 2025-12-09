@@ -48,16 +48,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const initAuth = async () => {
             console.log('Auth: Initializing...')
 
-            // Set a timeout to prevent infinite loading - reduced to 3s for faster UX
+            // Set a timeout to prevent infinite loading - 5s for reliable cross-tab session
             authTimeout = setTimeout(() => {
                 if (mounted && isLoading) {
                     console.warn('Auth: Timeout - proceeding without session')
                     setIsLoading(false)
                 }
-            }, 3000) // 3 seconds max for snappy UX
+            }, 5000) // 5 seconds for cross-tab reliability
 
             try {
-                const { data, error } = await supabase.auth.getSession()
+                // Try to get session, retry once if it fails
+                let sessionData = await supabase.auth.getSession()
+
+                // If no session on first try, wait a moment and retry (helps with cross-tab sync)
+                if (!sessionData.data?.session && !sessionData.error) {
+                    await new Promise(resolve => setTimeout(resolve, 500))
+                    sessionData = await supabase.auth.getSession()
+                }
+
+                const { data, error } = sessionData
                 console.log('Auth: getSession result:', { hasSession: !!data?.session, error: error?.message })
 
                 if (!mounted) return
@@ -199,9 +208,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function signIn(email: string, password: string) {
         setIsLoading(true)
         try {
-            // Add timeout to prevent infinite loading
+            // Increased timeout for slower networks (30 seconds)
             const timeoutPromise = new Promise<{ data: null, error: Error }>((_, reject) => {
-                setTimeout(() => reject(new Error('Login timed out. Please try again.')), 15000)
+                setTimeout(() => reject(new Error('Login timed out. Please check your connection and try again.')), 30000)
             })
 
             const authPromise = supabase.auth.signInWithPassword({ email, password })
