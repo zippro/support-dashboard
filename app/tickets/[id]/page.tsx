@@ -122,7 +122,28 @@ export default function TicketDetail() {
         const channel = supabase
             .channel('messages')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `ticket_id=eq.${id}` }, (payload) => {
-                setMessages((prev) => [...prev, payload.new])
+                setMessages((prev) => {
+                    // Check if message with same ID already exists
+                    if (prev.some(m => m.id === payload.new.id)) return prev
+
+                    // Check if we have a temp message with same content (optimistic update)
+                    // If so, replace it with real message
+                    const tempMatchIndex = prev.findIndex(m =>
+                        m.id.toString().startsWith('temp-') &&
+                        m.content === payload.new.content &&
+                        // Optional: check creation time tolerance if needed, but content match for agent is usually enough
+                        m.sender_type === payload.new.sender_type
+                    )
+
+                    if (tempMatchIndex !== -1) {
+                        const newMessages = [...prev]
+                        newMessages[tempMatchIndex] = payload.new
+                        return newMessages
+                    }
+
+                    // Otherwise append
+                    return [...prev, payload.new]
+                })
             })
             .subscribe()
 
