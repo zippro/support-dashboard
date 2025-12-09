@@ -343,7 +343,7 @@ function TicketListContent() {
 
     // Handlers
     const toggleTicketStatus = async (id: string, currentStatus: string) => {
-        const statusOrder = ['open', 'closed', 'pending']
+        const statusOrder = ['open', 'closed', 'duplicated', 'pending']
         const currentIdx = statusOrder.indexOf(currentStatus)
         const nextStatus = statusOrder[(currentIdx + 1) % statusOrder.length]
 
@@ -555,8 +555,9 @@ function TicketListContent() {
                     >
                         <option value="all">All Statuses</option>
                         <option value="open">Open</option>
-                        <option value="pending">Pending</option>
                         <option value="closed">Closed</option>
+                        <option value="duplicated">Duplicated</option>
+                        <option value="pending">Pending</option>
                     </select>
 
                     {/* Date Filter */}
@@ -600,6 +601,7 @@ function TicketListContent() {
                                 <option value="">Bulk Actions...</option>
                                 <option value="open">Mark as Open</option>
                                 <option value="closed">Mark as Closed</option>
+                                <option value="duplicated">Mark as Duplicated</option>
                                 <option value="pending">Mark as Pending</option>
                                 <option value="delete">Delete Tickets</option>
                             </select>
@@ -724,7 +726,8 @@ function TicketListContent() {
                                                     inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border shadow-sm transition-all
                                                     ${ticket.status === 'open' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' :
                                                         ticket.status === 'closed' ? 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700' :
-                                                            'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800'}
+                                                            ticket.status === 'duplicated' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800' :
+                                                                'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800'}
                                                 `}
                                             >
                                                 {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}

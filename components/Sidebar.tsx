@@ -20,7 +20,8 @@ const navigation = [
 export function Sidebar() {
     const pathname = usePathname()
     const [openTicketCount, setOpenTicketCount] = useState(0)
-    const { isAuthenticated, profile, user, signOut, isLoading } = useAuth()
+    const { isAuthenticated, profile, user, signOut, isLoading, session } = useAuth()
+
 
     useEffect(() => {
         // Skip fetching if on login/register pages
@@ -74,6 +75,9 @@ export function Sidebar() {
                     />
                 </div>
             </div>
+
+
+
             <nav className="flex-1 space-y-2 px-4 py-6">
                 {navigation.map((item) => {
                     const isActive = pathname === item.href

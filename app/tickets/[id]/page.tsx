@@ -161,7 +161,7 @@ export default function TicketDetail() {
     const toggleStatus = async () => {
         if (!ticket || !isAuthenticated) return
 
-        const statusOrder = ['open', 'closed', 'pending']
+        const statusOrder = ['open', 'closed', 'duplicated', 'pending']
         const currentIdx = statusOrder.indexOf(ticket.status)
         const nextStatus = statusOrder[(currentIdx + 1) % statusOrder.length]
 
@@ -222,12 +222,16 @@ export default function TicketDetail() {
                 // We pass `translate` flag to backend mostly for metadata or if backend needs to know source language.
                 // But for the email body, we send `finalContent`.
 
+                // Format message for HTML email (replace newlines with <br>)
+                const attachmentHtml = attachmentUrls.length > 0 ? `<br><br>Attachments:<br>${attachmentUrls.join('<br>')}` : ''
+                const messageHtml = finalContent.replace(/\n/g, '<br>') + attachmentHtml
+
                 const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ticket_id: id,
-                        message: finalContent + (attachmentUrls.length > 0 ? `\n\nAttachments:\n${attachmentUrls.join('\n')}` : ''),
+                        message: messageHtml, // Send HTML formatted message
                         user_email: ticket.users.email,
                         agent_email: user?.email || 'support@narcade.com', // Fallback to support email
                         subject: ticket.subject,
@@ -385,7 +389,8 @@ export default function TicketDetail() {
                                     ${!isAuthenticated ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:opacity-80'}
                                     ${ticket.status === 'open' ? 'bg-green-100 text-green-800' :
                                         ticket.status === 'closed' ? 'bg-gray-100 text-gray-800' :
-                                            'bg-yellow-100 text-yellow-800'}`}
+                                            ticket.status === 'duplicated' ? 'bg-purple-100 text-purple-800' :
+                                                'bg-yellow-100 text-yellow-800'}`}
                             >
                                 <span className="capitalize">{ticket.status}</span>
                                 {isAuthenticated ? <ChevronDown className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
@@ -512,12 +517,19 @@ export default function TicketDetail() {
                                 <span className="text-sm">Sign in to reply to tickets</span>
                             </div>
                         ) : (
-                            <input
-                                type="text"
+                            <textarea
                                 value={newMessage}
                                 onChange={(e) => setNewMessage(e.target.value)}
                                 placeholder="Type your reply..."
-                                className="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+                                rows={3}
+                                onKeyDown={(e) => {
+                                    // Submit on Cmd+Enter or Ctrl+Enter
+                                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                        e.preventDefault()
+                                        sendMessage(e as any, false)
+                                    }
+                                }}
+                                className="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white resize-none"
                             />
                         )}
                         {/* Attachment Button */}
@@ -559,19 +571,22 @@ export default function TicketDetail() {
                                         if (newMessage.trim() && ticket?.users?.email) {
                                             setIsTranslating(true)
                                             try {
+                                                // Convert newlines to <br> for Translation webhook
+                                                const messageHtml = newMessage.replace(/\n/g, '<br>')
+
                                                 // Use friendly path 'send-reply' instead of specific UUID which might change
                                                 const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
                                                     body: JSON.stringify({
                                                         ticket_id: id,
-                                                        message: newMessage,
+                                                        message: messageHtml, // Send HTML formatted message
                                                         user_email: ticket.users.email,
                                                         agent_email: user?.email || 'support@narcade.com',
                                                         subject: ticket.subject,
                                                         language: ticket.language,
                                                         translate: true,
-                                                        preview_only: true,
+                                                        preview_only: true, // Preview Only = Just Translate
                                                         game_name: ticket.game_name || 'Support'
                                                     })
                                                 })
@@ -579,7 +594,15 @@ export default function TicketDetail() {
                                                 if (response.ok) {
                                                     try {
                                                         const data = await response.json()
-                                                        setPendingMessage({ original: newMessage, translated: data.message || newMessage, translate: true })
+                                                        console.log('Creates Ticket Translation Response:', data)
+                                                        let translatedText = data.message || data.output || data.text || data.result || data.content || newMessage
+
+                                                        // Convert <br> back to \n for display in textarea/preview
+                                                        if (translatedText) {
+                                                            translatedText = translatedText.replace(/<br\s*\/?>/gi, '\n')
+                                                        }
+
+                                                        setPendingMessage({ original: newMessage, translated: translatedText, translate: true })
                                                     } catch (e) {
                                                         console.error('Translation JSON parse error:', e)
                                                         // Fallback to text if JSON fails but response was OK (rare but possible)

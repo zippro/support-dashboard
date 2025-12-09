@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
-import { ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, MessageSquare, AlertTriangle, TrendingUp, TrendingDown, Users, Activity, Sparkles, Inbox, Minus } from 'lucide-react'
+import { ArrowUp, ArrowDown, Clock, CheckCircle, AlertCircle, MessageSquare, AlertTriangle, TrendingUp, TrendingDown, Users, Activity, Sparkles, Inbox, Minus, Copy } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -51,7 +51,7 @@ function StatCard({ title, value, icon: Icon, color, trend, trendLabel, subtext,
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState({ total: 0, open: 0, closed: 0, pending: 0, totalTrend: 0, openTrend: 0, important: 0 })
+  const [stats, setStats] = useState({ total: 0, open: 0, closed: 0, pending: 0, duplicated: 0, totalTrend: 0, openTrend: 0, important: 0 })
   const [allTickets, setAllTickets] = useState<any[]>([])
   const [projectMap, setProjectMap] = useState<Record<string, string>>({})
   const [gameStats, setGameStats] = useState<any[]>([])
@@ -123,13 +123,22 @@ export default function Dashboard() {
 
         if (tickets) {
           setAllTickets(tickets)
-          const total = tickets.length, open = tickets.filter(t => t.status === 'open').length, closed = tickets.filter(t => t.status === 'closed').length, pending = tickets.filter(t => t.status === 'pending').length, important = tickets.filter(t => t.importance === 'important').length
+          const total = tickets.length
+          const open = tickets.filter(t => t.status === 'open').length
+          const closed = tickets.filter(t => t.status === 'closed').length
+          const pending = tickets.filter(t => t.status === 'pending').length
+          const duplicated = tickets.filter(t => t.status === 'duplicated').length
+          const important = tickets.filter(t => t.importance === 'important').length
+
           const todayTickets = tickets.filter(t => new Date(t.created_at) >= todayStart)
           const yesterdayTickets = tickets.filter(t => { const d = new Date(t.created_at); return d >= yesterdayStart && d < todayStart })
           const weekTickets = tickets.filter(t => new Date(t.created_at) >= lastWeek)
+
           const totalTrend = yesterdayTickets.length === 0 ? (todayTickets.length > 0 ? 100 : 0) : Math.round(((todayTickets.length - yesterdayTickets.length) / yesterdayTickets.length) * 100)
           const openTrend = yesterdayTickets.filter(t => t.status === 'open').length === 0 ? (todayTickets.filter(t => t.status === 'open').length > 0 ? 100 : 0) : Math.round(((todayTickets.filter(t => t.status === 'open').length - yesterdayTickets.filter(t => t.status === 'open').length) / yesterdayTickets.filter(t => t.status === 'open').length) * 100)
-          setStats({ total, open, closed, pending, totalTrend, openTrend, important })
+
+          setStats({ total, open, closed, pending, duplicated, totalTrend, openTrend, important })
+
           setComparisonData([
             { name: 'Total', yesterday: yesterdayTickets.length, today: todayTickets.length },
             { name: 'Open', yesterday: yesterdayTickets.filter(t => t.status === 'open').length, today: todayTickets.filter(t => t.status === 'open').length },
@@ -220,10 +229,11 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
         <StatCard title="Total Tickets" value={stats.total} icon={Inbox} color="bg-indigo-500" trend={stats.totalTrend} trendLabel="vs. yesterday" href="/tickets" />
         <StatCard title="Open Tickets" value={stats.open} icon={AlertCircle} color="bg-red-500" trend={stats.openTrend} trendLabel="vs. yesterday" href="/tickets?status=open" />
         <StatCard title="Important" value={stats.important} icon={AlertTriangle} color="bg-orange-500" subtext="Needs attention" href="/tickets?importance=important" />
+        <StatCard title="Duplicated" value={stats.duplicated} icon={Copy} color="bg-purple-500" subtext="Repeated issues" href="/tickets?status=duplicated" />
         <StatCard title="Resolved" value={stats.closed} icon={CheckCircle} color="bg-green-500" subtext="Successfully closed" href="/tickets?status=closed" />
       </div>
 

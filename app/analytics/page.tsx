@@ -6,7 +6,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, AreaChart, Area, LineChart, Line
 } from 'recharts'
-import { Calendar, TrendingUp, TrendingDown, Clock, CheckCircle, AlertCircle, Timer, RotateCcw, Zap } from 'lucide-react'
+import { Calendar, TrendingUp, TrendingDown, Clock, CheckCircle, AlertCircle, Timer, RotateCcw, Zap, CheckSquare } from 'lucide-react'
 
 const COLORS = ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4']
 const PRIORITY_COLORS = { important: '#EF4444', normal: '#F59E0B', low: '#10B981' }
@@ -21,7 +21,7 @@ export default function AnalyticsPage() {
 
     // Stats
     const [stats, setStats] = useState({
-        created: 0, solved: 0, open: 0, pending: 0, reopened: 0,
+        created: 0, solved: 0, open: 0, pending: 0, duplicated: 0, reopened: 0,
         avgResolutionHours: 0, firstResponseHours: 0, oneTouchRate: 0
     })
 
@@ -64,6 +64,7 @@ export default function AnalyticsPage() {
                 const solved = tickets.filter(t => t.status === 'closed').length
                 const open = tickets.filter(t => t.status === 'open').length
                 const pending = tickets.filter(t => t.status === 'pending').length
+                const duplicated = tickets.filter(t => t.status === 'duplicated').length
                 const reopened = tickets.filter(t => t.reopened_count && t.reopened_count > 0).length
 
                 // Calculate averages (mock for now - would need actual timestamps)
@@ -71,7 +72,7 @@ export default function AnalyticsPage() {
                 const firstResponseHours = created > 0 ? Math.round(Math.random() * 4 + 0.5) : 0
                 const oneTouchRate = solved > 0 ? Math.round((solved / created) * 100) : 0
 
-                setStats({ created, solved, open, pending, reopened, avgResolutionHours, firstResponseHours, oneTouchRate })
+                setStats({ created, solved, open, pending, duplicated, reopened, avgResolutionHours, firstResponseHours, oneTouchRate })
 
                 // Hourly Distribution (0-23)
                 const hourCounts: number[] = Array(24).fill(0)
@@ -177,10 +178,11 @@ export default function AnalyticsPage() {
                 {tab === 'overview' && (
                     <>
                         {/* Stats Row */}
-                        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+                        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
                             <StatCard label="Created" value={stats.created} icon={<Calendar className="w-5 h-5" />} color="indigo" />
-                            <StatCard label="Solved" value={stats.solved} icon={<CheckCircle className="w-5 h-5" />} color="green" trend={stats.created > 0 ? Math.round((stats.solved / stats.created) * 100) : 0} />
                             <StatCard label="Open" value={stats.open} icon={<AlertCircle className="w-5 h-5" />} color="red" />
+                            <StatCard label="Closed" value={stats.solved} icon={<CheckCircle className="w-5 h-5" />} color="green" trend={stats.created > 0 ? Math.round((stats.solved / stats.created) * 100) : 0} />
+                            <StatCard label="Duplicated" value={stats.duplicated} icon={<CheckSquare className="w-5 h-5" />} color="purple" />
                             <StatCard label="Pending" value={stats.pending} icon={<Clock className="w-5 h-5" />} color="yellow" />
                             <StatCard label="Reopened" value={stats.reopened} icon={<RotateCcw className="w-5 h-5" />} color="purple" />
                         </div>

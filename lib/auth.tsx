@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { supabase } from './supabase'
+import { supabase } from '@/lib/supabase'
 import { User, Session } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 
@@ -36,33 +36,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         let mounted = true
 
-        // 1. Initial Session Check
-        const initAuth = async () => {
+        async function getInitialSession() {
             try {
                 const { data: { session }, error } = await supabase.auth.getSession()
 
-                if (error) {
-                    console.error('Auth: Error checking session:', error)
-                    if (mounted) setIsLoading(false)
-                    return
-                }
-
                 if (mounted) {
-                    handleSession(session)
+                    if (error) {
+                        console.error('Auth: Error getting session', error)
+                    }
+                    if (session) {
+                        console.log('Auth: Initial session found', session.user.email)
+                        setSession(session)
+                        setUser(session.user)
+                        await fetchProfile(session.user, mounted)
+                    } else {
+                        console.log('Auth: No initial session')
+                        setIsLoading(false)
+                    }
                 }
             } catch (err) {
-                console.error('Auth: Unexpected init error:', err)
+                console.error('Auth: Unexpected init error', err)
                 if (mounted) setIsLoading(false)
             }
         }
 
-        initAuth()
+        getInitialSession()
 
-        // 2. Listen for Auth Changes (Login, SignOut, Token Refresh)
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-            console.log('Auth: State changed:', _event)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth: State change event', event)
+
             if (mounted) {
-                await handleSession(session)
+                setSession(session)
+                setUser(session?.user ?? null)
+                setIsLoading(true) // Briefly set loading while we fetch profile
+
+                if (session?.user) {
+                    // Update profile but don't block
+                    fetchProfile(session.user, mounted)
+                } else {
+                    setProfile(null)
+                    setIsLoading(false)
+                    if (event === 'SIGNED_OUT') {
+                        router.refresh()
+                        router.push('/login')
+                    }
+                }
             }
         })
 
@@ -70,124 +88,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             mounted = false
             subscription.unsubscribe()
         }
-    }, [])
+    }, [router])
 
-    // Centralized Session Handler
-    async function handleSession(currentSession: Session | null) {
-        setSession(currentSession)
-        setUser(currentSession?.user ?? null)
-
-        if (currentSession?.user) {
-            // Fetch profile whenever we have a user
-            await fetchProfile(currentSession.user)
-        } else {
-            // Clear profile if no user
-            setProfile(null)
-            setIsLoading(false)
-        }
-    }
-
-    async function fetchProfile(currentUser: User) {
+    async function fetchProfile(currentUser: User, isMounted: boolean) {
         try {
             const { data, error } = await supabase
                 .from('agent_profiles')
                 .select('*')
                 .eq('id', currentUser.id)
-                .single()
+                .maybeSingle()
 
-            if (data) {
-                setProfile(data)
-            } else {
-                console.warn('Auth: Profile missing, using metadata fallback')
-                // Fallback to metadata if profile doesn't exist yet
-                const metaName = currentUser.user_metadata?.name ||
-                    currentUser.user_metadata?.full_name ||
-                    currentUser.email?.split('@')[0] || 'User'
-
-                setProfile({
-                    id: currentUser.id,
-                    name: metaName,
-                    email: currentUser.email || '',
-                    avatar_url: currentUser.user_metadata?.avatar_url || null
-                })
+            if (isMounted) {
+                if (data) {
+                    setProfile(data)
+                } else {
+                    // Fallback to metadata
+                    setProfile({
+                        id: currentUser.id,
+                        name: currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'User',
+                        email: currentUser.email || '',
+                        avatar_url: currentUser.user_metadata?.avatar_url || null
+                    })
+                }
+                setIsLoading(false)
             }
-        } catch (err) {
-            console.error('Auth: Failed to fetch profile:', err)
-        } finally {
-            setIsLoading(false)
+        } catch (error) {
+            console.error('Auth: Profile fetch error', error)
+            if (isMounted) setIsLoading(false)
         }
     }
 
     async function signIn(email: string, password: string) {
-        setIsLoading(true) // Set loading UI immediately
+        // Return result, let onAuthStateChange handle state
         const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-
-        if (error) {
-            setIsLoading(false) // Only stop loading on error, success handled by onAuthStateChange
-            return { error }
-        }
-
-        return { error: null }
+        return { error }
     }
 
     async function signUp(email: string, password: string, name: string) {
-        setIsLoading(true)
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
-            options: {
-                data: { name } // Store name in metadata immediately
-            }
+            options: { data: { name } }
         })
 
         if (!error && data.user) {
-            // Optimistically create profile
+            // Optimistic profile creation
             await supabase.from('agent_profiles').insert({
                 id: data.user.id,
                 email: data.user.email,
                 name: name
             })
-        } else {
-            setIsLoading(false)
         }
-
         return { error }
     }
 
     async function signOut() {
-        setIsLoading(true)
-        try {
-            await supabase.auth.signOut()
-            // State updates handled by onAuthStateChange
-            router.push('/login')
-        } catch (error) {
-            console.error('Auth: SignOut error:', error)
-            // Force local clear even if API fails
-            setSession(null)
-            setUser(null)
-            setProfile(null)
-            setIsLoading(false)
-            router.push('/login')
-        }
+        await supabase.auth.signOut()
+        // Router push handled by onAuthStateChange
     }
 
     async function updateProfile(updates: Partial<AgentProfile>) {
         if (!user) return { error: new Error('Not authenticated') }
-
-        // Optimistic update
-        setProfile(prev => prev ? { ...prev, ...updates } : null)
-
         const { error } = await supabase
             .from('agent_profiles')
             .update(updates)
             .eq('id', user.id)
 
-        // Revert if error (optional, but good practice)
-        if (error) {
-            console.error('Auth: Update failed, reverting', error)
-            // In a real app we might fetchProfile(user) here to reset
+        if (!error) {
+            setProfile(prev => prev ? { ...prev, ...updates } : null)
         }
-
         return { error }
     }
 

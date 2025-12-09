@@ -27,7 +27,8 @@ export default function LoginPage() {
             setError(error.message)
             setLoading(false)
         } else {
-            router.push('/')
+            // Force hard redirect to ensure clean auth state
+            window.location.href = '/'
         }
     }
 

@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="tr">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+        <title>Yeni Nesil Destek Sistemi</title>
+
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reset.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.css">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/theme/black.min.css">
+    </head>
+    <body>
+        <div class="reveal">
+            <div class="slides">
+                <!-- Slide 1 -->
+                <section>
+                    <h1>🚀 Yeni Nesil Destek Sistemi</h1>
+                    <h3>Otomatik • Akıllı • Entegre</h3>
+                    <p style="text-align: left; font-size: 0.8em; margin-top: 2em;">
+                        <strong>Genel Bakış</strong><br>
+                        Unity oyunları, Yapay Zeka analizi ve çok kanallı destek arayüzlerini birleştiren uçtan uca tam kapsamlı bir destek çözümü.
+                    </p>
+                    <div style="text-align: left; font-size: 0.7em; background: rgba(255,255,255,0.1); padding: 1em; border-radius: 8px;">
+                        <strong>Öne Çıkan Özellikler</strong>
+                        <ul>
+                            <li>🤖 <strong>Sıfır Dokunuşla Sınıflandırma</strong>: AI, ticket'ları anında analiz eder.</li>
+                            <li>🌍 <strong>Evrensel Dil</strong>: Gerçek zamanlı otomatik çeviri.</li>
+                            <li>⚡ <strong>Gerçek Zamanlı</strong>: Discord ve Web Paneli entegrasyonu.</li>
+                            <li>📊 <strong>Veri Odaklı</strong>: Duygu ve platform analitiği.</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Slide 2 -->
+                <section>
+                    <h2>🏗️ Sistem Mimarisi</h2>
+                    <p>Oyuncudan destek ekibine kesintisiz akış.</p>
+                    <div class="mermaid">
+                    graph LR
+                        P[🎮 Oyuncu] -->|Webhook| N{⚡ n8n}
+                        
+                        subgraph "🤖 Zeka"
+                            N -->|Çıkar| OA[GPT-4]
+                            OA -->|Analiz| SA[Analiz]
+                            OA -->|Çevir| TR[Çeviri]
+                        end
+                        
+                        subgraph "💾 Veri"
+                            SA & TR -->|Yaz| DB[(Supabase)]
+                        end
+                        
+                        subgraph "🖥️ Arayüzler"
+                            DB -->|Canlı| D[📊 Panel]
+                            DB -->|Bildir| DC[👾 Discord]
+                            D <-->|Yanıt| M[📧 E-posta]
+                        end
+                    </div>
+                </section>
+
+                <!-- Slide 3 -->
+                <section>
+                    <h2>⚙️ Akıllı Otomasyon</h2>
+                    <div class="mermaid">
+                    sequenceDiagram
+                        participant U as Unity Oyunu
+                        participant W as Webhook
+                        participant AI as AI Motoru
+                        participant DB as Postgres DB
+                        participant D as Discord
+
+                        U->>W: Rapor Gönder (JSON)
+                        W->>AI: Ham Metin
+                        AI->>AI: veriyi yapılandır
+                        AI->>AI: dili algıla & çevir
+                        AI->>AI: duygu analizi yap
+                        AI->>AI: anahtar kelimeleri çıkar
+                        AI->>DB: Kullanıcıyı Kontrol Et/Oluştur
+                        AI->>DB: Ticket & Mesaj Oluştur
+                        DB-->>D: 🔔 Zengin Bildirim Gönder
+                    </div>
+                </section>
+
+                <!-- Slide 4 -->
+                <section>
+                    <h2>👾 Discord Entegrasyonu</h2>
+                    <p>Destek ekipleri için zengin bildirimler.</p>
+                    <ul>
+                        <li>Renk Kodlu Öncelik</li>
+                        <li>Anlık Bağlam (Seviye, Coin)</li>
+                        <li>Tek Tıkla Erişim</li>
+                    </ul>
+                    <img src="uploaded_image_0_1765230255690.png" style="max-height: 400px; border-radius: 8px;">
+                </section>
+
+                <!-- Slide 5 -->
+                <section>
+                    <h2>🖥️ Web Kontrol Paneli</h2>
+                    <p>Merkezi komuta merkezi.</p>
+                    <ul>
+                        <li>🔐 Güvenli Giriş</li>
+                        <li>Genel Bakış & Performans</li>
+                    </ul>
+                    <img src="dashboard_home_tr_1765315373396.png" style="max-height: 400px; border-radius: 8px;">
+                </section>
+
+                <!-- Slide 6 -->
+                <section>
+                    <h2>📋 Ticket Yönetimi</h2>
+                    <p>Filtreleme, sıralama ve hızlı işlem.</p>
+                    <img src="ticket_list_tr_1765315386214.png" style="max-height: 500px; border-radius: 8px;">
+                </section>
+
+                <!-- Slide 7 -->
+                <section>
+                    <h2>💬 Ticket Detayı</h2>
+                    <p>Çeviri desteği ve detaylı oyuncu verisi.</p>
+                    <img src="ticket_detail_tr_1765315401162.png" style="max-height: 500px; border-radius: 8px;">
+                </section>
+
+                <!-- Slide 8 -->
+                <section>
+                    <h2>📊 Analitik & Raporlama</h2>
+                    <p>Günlük özetler ve ani artış uyarıları.</p>
+                    <div style="display: flex; justify-content: center; gap: 20px;">
+                        <img src="uploaded_image_2_1765230255690.png" style="max-height: 300px; border-radius: 8px;">
+                        <img src="analytics_page_tr_1765315379880.png" style="max-height: 300px; border-radius: 8px;">
+                    </div>
+                </section>
+
+                <!-- Slide 9 -->
+                <section>
+                    <h2>🛣️ Yol Haritası</h2>
+                    <ul>
+                        <li>🤖 <strong>Otomatik Yanıtlayıcı</strong>: AI ile taslak yanıtlar.</li>
+                        <li>📱 <strong>Mobil Uygulama</strong>: Yönetici uygulaması.</li>
+                        <li>🔗 <strong>Jira Entegrasyonu</strong>: Tek tıkla hata kaydı.</li>
+                        <li>🧠 <strong>Bilgi Bankası</strong>: Otomatik SSS.</li>
+                    </ul>
+                    <div style="margin-top: 2em; padding: 1em; background: rgba(56, 189, 248, 0.2); border-radius: 8px;">
+                        Bu sistem şu anda canlıdır ve Unity oyunlarından gelen gerçek ticket'ları işlemektedir.
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.0.4/reveal.min.js"></script>
+        <script type="module">
+            import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+            mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+        </script>
+        <script>
+            Reveal.initialize({
+                controls: true,
+                progress: true,
+                center: true,
+                hash: true,
+                autoSlide: 3000, 
+                loop: false,
+            });
+        </script>
+    </body>
+</html>
