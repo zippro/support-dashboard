@@ -29,14 +29,4 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     },
 })
 
-// Helper to get stored agent email from localStorage
-export function getStoredAgentEmail(): string {
-    if (typeof window === 'undefined') return ''
-    return localStorage.getItem('narcade-agent-email') || ''
-}
 
-// Helper to store agent email in localStorage
-export function setStoredAgentEmail(email: string): void {
-    if (typeof window === 'undefined') return
-    localStorage.setItem('narcade-agent-email', email)
-}

@@ -9,7 +9,7 @@ import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle,
 
 export default function TicketDetail() {
     const { id } = useParams()
-    const { isAuthenticated, user, profile, agentEmail } = useAuth()
+    const { isAuthenticated, user, profile } = useAuth()
     const [ticket, setTicket] = useState<any>(null)
     const [messages, setMessages] = useState<any[]>([])
     const [newMessage, setNewMessage] = useState('')
@@ -193,7 +193,7 @@ export default function TicketDetail() {
         if (ticket?.users?.email && finalContent) {
             if (translate) setIsTranslating(true)
 
-            console.log('Agent email being sent:', agentEmail)
+            console.log('Agent email being sent:', user?.email)
 
             try {
                 // If translate=true, we are sending a Translated message (which is already in finalContent).
@@ -208,7 +208,7 @@ export default function TicketDetail() {
                         ticket_id: id,
                         message: finalContent + (attachmentUrls.length > 0 ? `\n\nAttachments:\n${attachmentUrls.join('\n')}` : ''),
                         user_email: ticket.users.email,
-                        agent_email: agentEmail || 'support@narcade.com', // Fallback to support email
+                        agent_email: user?.email || 'support@narcade.com', // Fallback to support email
                         subject: ticket.subject,
                         language: ticket.language,
                         translate: translate, // correct flag based on action
@@ -545,7 +545,7 @@ export default function TicketDetail() {
                                                         ticket_id: id,
                                                         message: newMessage,
                                                         user_email: ticket.users.email,
-                                                        agent_email: agentEmail || 'support@narcade.com',
+                                                        agent_email: user?.email || 'support@narcade.com',
                                                         subject: ticket.subject,
                                                         language: ticket.language,
                                                         translate: true,

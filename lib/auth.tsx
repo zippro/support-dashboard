@@ -1,8 +1,9 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { supabase, setStoredAgentEmail, getStoredAgentEmail } from './supabase'
+import { supabase } from './supabase'
 import { User, Session } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 
 interface AgentProfile {
     id: string
@@ -17,7 +18,6 @@ interface AuthContextType {
     session: Session | null
     isLoading: boolean
     isAuthenticated: boolean
-    agentEmail: string  // Always available, even if profile is loading
     signIn: (email: string, password: string) => Promise<{ error: any }>
     signUp: (email: string, password: string, name: string) => Promise<{ error: any }>
     signOut: () => Promise<void>
@@ -31,264 +31,161 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [profile, setProfile] = useState<AgentProfile | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [isLoading, setIsLoading] = useState(true)
-    const [agentEmail, setAgentEmail] = useState<string>('')
-
-    // Initialize agent email from localStorage
-    useEffect(() => {
-        const storedEmail = getStoredAgentEmail()
-        if (storedEmail) {
-            setAgentEmail(storedEmail)
-        }
-    }, [])
+    const router = useRouter()
 
     useEffect(() => {
         let mounted = true
-        let authTimeout: NodeJS.Timeout
 
+        // 1. Initial Session Check
         const initAuth = async () => {
-            console.log('Auth: Initializing...')
-
-            // Set a timeout to prevent infinite loading - 5s for reliable cross-tab session
-            authTimeout = setTimeout(() => {
-                if (mounted && isLoading) {
-                    console.warn('Auth: Timeout - proceeding without session')
-                    setIsLoading(false)
-                }
-            }, 5000) // 5 seconds for cross-tab reliability
-
             try {
-                // Try to get session, retry once if it fails
-                let sessionData = await supabase.auth.getSession()
-
-                // If no session on first try, wait a moment and retry (helps with cross-tab sync)
-                if (!sessionData.data?.session && !sessionData.error) {
-                    await new Promise(resolve => setTimeout(resolve, 500))
-                    sessionData = await supabase.auth.getSession()
-                }
-
-                const { data, error } = sessionData
-                console.log('Auth: getSession result:', { hasSession: !!data?.session, error: error?.message })
-
-                if (!mounted) return
+                const { data: { session }, error } = await supabase.auth.getSession()
 
                 if (error) {
-                    console.error('Auth: Session error:', error)
-                    setIsLoading(false)
+                    console.error('Auth: Error checking session:', error)
+                    if (mounted) setIsLoading(false)
                     return
                 }
 
-                const currentSession = data?.session
-                setSession(currentSession)
-                setUser(currentSession?.user ?? null)
-
-                if (currentSession?.user) {
-                    // Store email immediately from session
-                    if (currentSession.user.email) {
-                        setAgentEmail(currentSession.user.email)
-                        setStoredAgentEmail(currentSession.user.email)
-                    }
-
-                    // Set an optimistic profile from user metadata immediately
-                    // This prevents the "User" fallback while the real profile loads
-                    const metaName = currentSession.user.user_metadata?.name ||
-                        currentSession.user.user_metadata?.full_name ||
-                        currentSession.user.email?.split('@')[0] || 'User'
-                    setProfile(prev => prev || {
-                        id: currentSession.user.id,
-                        name: metaName,
-                        email: currentSession.user.email || '',
-                        avatar_url: currentSession.user.user_metadata?.avatar_url || null
-                    })
-
-                    // Fetch actual profile (will update if different)
-                    await fetchProfileSafe(currentSession.user.id)
+                if (mounted) {
+                    handleSession(session)
                 }
             } catch (err) {
-                console.error('Auth: Init error:', err)
-            } finally {
-                if (mounted) {
-                    clearTimeout(authTimeout)
-                    setIsLoading(false)
-                    console.log('Auth: Initialization complete')
-                }
+                console.error('Auth: Unexpected init error:', err)
+                if (mounted) setIsLoading(false)
             }
         }
 
         initAuth()
 
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('Auth: State change:', event, { hasSession: !!session })
-
-            if (!mounted) return
-
-            setSession(session)
-            setUser(session?.user ?? null)
-
-            if (session?.user) {
-                // Store email immediately
-                if (session.user.email) {
-                    setAgentEmail(session.user.email)
-                    setStoredAgentEmail(session.user.email)
-                }
-
-                // Set optimistic profile immediately from user metadata
-                const metaName = session.user.user_metadata?.name ||
-                    session.user.user_metadata?.full_name ||
-                    session.user.email?.split('@')[0] || 'User'
-                setProfile(prev => prev || {
-                    id: session.user.id,
-                    name: metaName,
-                    email: session.user.email || '',
-                    avatar_url: session.user.user_metadata?.avatar_url || null
-                })
-
-                await fetchProfileSafe(session.user.id)
-            } else {
-                setProfile(null)
-                setAgentEmail(getStoredAgentEmail()) // Fall back to stored email
+        // 2. Listen for Auth Changes (Login, SignOut, Token Refresh)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            console.log('Auth: State changed:', _event)
+            if (mounted) {
+                await handleSession(session)
             }
         })
 
         return () => {
             mounted = false
-            clearTimeout(authTimeout)
             subscription.unsubscribe()
         }
     }, [])
 
-    async function fetchProfileSafe(userId: string) {
+    // Centralized Session Handler
+    async function handleSession(currentSession: Session | null) {
+        setSession(currentSession)
+        setUser(currentSession?.user ?? null)
+
+        if (currentSession?.user) {
+            // Fetch profile whenever we have a user
+            await fetchProfile(currentSession.user)
+        } else {
+            // Clear profile if no user
+            setProfile(null)
+            setIsLoading(false)
+        }
+    }
+
+    async function fetchProfile(currentUser: User) {
         try {
             const { data, error } = await supabase
                 .from('agent_profiles')
                 .select('*')
-                .eq('id', userId)
+                .eq('id', currentUser.id)
                 .single()
-
-            if (error) {
-                console.error('Auth: Profile fetch error:', error)
-                return
-            }
 
             if (data) {
                 setProfile(data)
-                // Update stored email with profile email
-                if (data.email) {
-                    setAgentEmail(data.email)
-                    setStoredAgentEmail(data.email)
-                }
             } else {
-                console.warn('Auth: No profile found for user', userId)
-                // Attempt to create a default profile if none exists
-                const user = await supabase.auth.getUser()
-                if (user.data.user?.email) {
-                    const splitName = user.data.user.email.split('@')[0]
-                    const { data: newProfile, error: createError } = await supabase
-                        .from('agent_profiles')
-                        .insert({
-                            id: userId,
-                            email: user.data.user.email,
-                            name: splitName.charAt(0).toUpperCase() + splitName.slice(1),
-                            avatar_url: null
-                        })
-                        .select()
-                        .single()
+                console.warn('Auth: Profile missing, using metadata fallback')
+                // Fallback to metadata if profile doesn't exist yet
+                const metaName = currentUser.user_metadata?.name ||
+                    currentUser.user_metadata?.full_name ||
+                    currentUser.email?.split('@')[0] || 'User'
 
-                    if (!createError && newProfile) {
-                        console.log('Auth: Created default profile')
-                        setProfile(newProfile)
-                    }
-                }
+                setProfile({
+                    id: currentUser.id,
+                    name: metaName,
+                    email: currentUser.email || '',
+                    avatar_url: currentUser.user_metadata?.avatar_url || null
+                })
             }
         } catch (err) {
-            console.error('Auth: Profile fetch exception:', err)
+            console.error('Auth: Failed to fetch profile:', err)
+        } finally {
+            setIsLoading(false)
         }
     }
 
     async function signIn(email: string, password: string) {
-        setIsLoading(true)
-        try {
-            // Increased timeout for slower networks (30 seconds)
-            const timeoutPromise = new Promise<{ data: null, error: Error }>((_, reject) => {
-                setTimeout(() => reject(new Error('Login timed out. Please check your connection and try again.')), 30000)
-            })
+        setIsLoading(true) // Set loading UI immediately
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-            const authPromise = supabase.auth.signInWithPassword({ email, password })
-
-            const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any
-
-            if (!error && data?.user && data?.session) {
-                // Manually update state to avoid race conditions
-                setSession(data.session)
-                setUser(data.user)
-
-                // Store email on successful login
-                setAgentEmail(email)
-                setStoredAgentEmail(email)
-            }
-
+        if (error) {
+            setIsLoading(false) // Only stop loading on error, success handled by onAuthStateChange
             return { error }
-        } catch (err: any) {
-            return { error: err }
-        } finally {
-            setIsLoading(false)
         }
+
+        return { error: null }
     }
 
     async function signUp(email: string, password: string, name: string) {
         setIsLoading(true)
-        try {
-            const { data, error } = await supabase.auth.signUp({ email, password })
-
-            if (!error && data.user) {
-                // Create profile
-                const { error: profileError } = await supabase
-                    .from('agent_profiles')
-                    .insert({ id: data.user.id, name, email })
-
-                if (profileError) {
-                    return { error: profileError }
-                }
-
-                // Store email
-                setAgentEmail(email)
-                setStoredAgentEmail(email)
+        const { data, error } = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+                data: { name } // Store name in metadata immediately
             }
+        })
 
-            return { error }
-        } finally {
+        if (!error && data.user) {
+            // Optimistically create profile
+            await supabase.from('agent_profiles').insert({
+                id: data.user.id,
+                email: data.user.email,
+                name: name
+            })
+        } else {
             setIsLoading(false)
         }
+
+        return { error }
     }
 
     async function signOut() {
+        setIsLoading(true)
         try {
             await supabase.auth.signOut()
+            // State updates handled by onAuthStateChange
+            router.push('/login')
+        } catch (error) {
+            console.error('Auth: SignOut error:', error)
+            // Force local clear even if API fails
+            setSession(null)
             setUser(null)
             setProfile(null)
-            setSession(null)
-            // Keep agentEmail in localStorage for reference
-            window.location.href = '/login'
-        } catch (error) {
-            console.error('Auth: Sign out error:', error)
-            window.location.href = '/login'
+            setIsLoading(false)
+            router.push('/login')
         }
     }
 
     async function updateProfile(updates: Partial<AgentProfile>) {
         if (!user) return { error: new Error('Not authenticated') }
 
+        // Optimistic update
+        setProfile(prev => prev ? { ...prev, ...updates } : null)
+
         const { error } = await supabase
             .from('agent_profiles')
             .update(updates)
             .eq('id', user.id)
 
-        if (!error) {
-            setProfile(prev => prev ? { ...prev, ...updates } : null)
-            if (updates.email) {
-                setAgentEmail(updates.email)
-                setStoredAgentEmail(updates.email)
-            }
+        // Revert if error (optional, but good practice)
+        if (error) {
+            console.error('Auth: Update failed, reverting', error)
+            // In a real app we might fetchProfile(user) here to reset
         }
 
         return { error }
@@ -301,7 +198,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             session,
             isLoading,
             isAuthenticated: !!user,
-            agentEmail,
             signIn,
             signUp,
             signOut,
