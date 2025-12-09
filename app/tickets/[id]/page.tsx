@@ -156,9 +156,9 @@ export default function TicketDetail() {
         }
     }
 
-    const sendMessage = async (e: React.FormEvent, closeTicket = false, translate = false) => {
+    const sendMessage = async (e: React.FormEvent, closeTicket = false, translate = false, explicitContent?: string) => {
         e.preventDefault()
-        if ((!newMessage.trim() && !attachment) || !id) return
+        if ((!newMessage.trim() && !attachment && !explicitContent) || !id) return
 
         let attachmentUrls: string[] = []
 
@@ -184,70 +184,39 @@ export default function TicketDetail() {
             attachmentUrls.push(publicUrl)
         }
 
-        // Logic to construct final message
-        let finalContent = newMessage
-        let translatedContent = null
+        // Logic to construct final message: Prefer explicit content (e.g. translated text) if provided
+        let finalContent = explicitContent || newMessage
+        let translatedContent = translate ? explicitContent : null // If translating, the content IS the translation
 
         // Translation Logic
-        if (ticket?.users?.email && newMessage.trim()) {
+        // We trigger the webhook if there is content to send.
+        if (ticket?.users?.email && finalContent) {
             if (translate) setIsTranslating(true)
 
-            // Get agent email - use agentEmail from context (always available via localStorage fallback)
             console.log('Agent email being sent:', agentEmail)
 
             try {
-                // If it's a translation PREVIEW (translate=true inside sendMessage is only called for preview or final send-with-translation)
-                // But wait, we need to distinguish between PREVIEWING and SENDING.
-                // The args are: closeTicket (bool), translate (bool).
-                // Existing logic: sendMessage(e, false, true) is called by "Translate & Send". But that triggers a preview first? 
-                // No, the UI button calls sendMessage(..., true) AFTER confirmation.
-
-                // Let's rely on the `preview_only` flag in the payload.
-                // We assume if this function is called, we are SENDING unless explicitly specified otherwise.
-                // But the PREVIEW logic is handled OUTSIDE this function in the UI button handler (lines 527+).
-                // So sendMessage is ALWAYS a "Send". 
-                // Therefore, preview_only should be FALSE.
-
-                // EXCEPT: The existing code seemed to conflate them.
-                // The backend now supports `preview_only`. 
-                // But here we are in sendMessage, which finalizes the message.
-                // So we want to send the email.
+                // If translate=true, we are sending a Translated message (which is already in finalContent).
+                // If translate=false, we are sending original English message.
+                // We pass `translate` flag to backend mostly for metadata or if backend needs to know source language.
+                // But for the email body, we send `finalContent`.
 
                 const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         ticket_id: id,
-                        message: newMessage + (attachmentUrls.length > 0 ? `\n\nAttachments:\n${attachmentUrls.join('\n')}` : ''),
+                        message: finalContent + (attachmentUrls.length > 0 ? `\n\nAttachments:\n${attachmentUrls.join('\n')}` : ''),
                         user_email: ticket.users.email,
                         agent_email: agentEmail || 'support@narcade.com', // Fallback to support email
                         subject: ticket.subject,
                         language: ticket.language,
-                        translate: true, // Always ask backend to translate if needed? No.
-                        // If `translate` arg is true, we want the email to be translated.
-                        // But the backend workflow translates IF `preview_only` is true OR if we add logic for translation on send.
-                        // Our backend logic (just updated) translates IF `preview_only` is true.
-                        // If we want to send a TRANSLATED email, we should probably send the translated content directly?
-                        // Or tell backend to translate-and-send.
-                        // The updated backend logic (Step 7372) splits: Preview -> Translate -> Return. Send -> Gmail. 
-                        // It does NOT have "Translate AND Send via Gmail" path. 
-                        // So if we have `translatedContent` from the preview, we should send THAT as the message.
-
-                        // Wait, looking at UI logic (lines 643+):
-                        // it calls sendMessage(..., pendingMessage.translate).
-                        // pendingMessage.translated ALREADY has the translated text if preview succeeded.
-                        // But sendMessage doesn't take `translatedText` as arg. It uses component state `newMessage`?
-                        // No, `newMessage` is the input.
-                        // We need `sendMessage` to accept the translated text if available.
-
-                        preview_only: false,
+                        translate: translate, // correct flag based on action
+                        preview_only: false, // Ensure we are SENDING
                         game_name: ticket.game_name || 'Support',
                         attachments: attachmentUrls
                     })
                 })
-
-                // If we want the email to contain the translated text, we need to pass it. 
-                // The current sendMessage logic doesn't seemingly switch `newMessage` to translated text.
 
             } catch (err) {
                 console.error('Error triggering email webhook:', err)
@@ -260,8 +229,8 @@ export default function TicketDetail() {
         const optimisticMessage = {
             id: 'temp-' + Date.now(),
             ticket_id: id,
-            content: finalContent,
-            content_translated: translatedContent,
+            content: newMessage,
+            content_translated: translate ? explicitContent : null,
             sender_type: 'agent',
             attachments: attachmentUrls,
             created_at: new Date().toISOString()
@@ -272,8 +241,8 @@ export default function TicketDetail() {
             .from('messages')
             .insert({
                 ticket_id: id,
-                content: finalContent,
-                content_translated: translatedContent,
+                content: newMessage,
+                content_translated: translate ? explicitContent : null,
                 sender_type: 'agent',
                 attachments: attachmentUrls
             })
@@ -684,7 +653,7 @@ export default function TicketDetail() {
                                     onClick={async (e) => {
                                         if (pendingMessage) {
                                             setShowCloseModal(false)
-                                            await sendMessage(e as any, false, pendingMessage.translate)
+                                            await sendMessage(e as any, false, false, pendingMessage.original)
                                             setPendingMessage(null)
                                         }
                                     }}
@@ -697,7 +666,25 @@ export default function TicketDetail() {
                                     onClick={async (e) => {
                                         if (pendingMessage) {
                                             setShowCloseModal(false)
-                                            await sendMessage(e as any, true, pendingMessage.translate)
+                                            // Determine context: if it was a translate request (pendingMessage.translate=true),
+                                            // we likely want to send the TRANSLATION.
+                                            // But wait, this second button is "Send & Close".
+                                            // The user might want to send Original or Translated depending on the mode.
+                                            // Let's stick to the mode logic:
+                                            // If pendingMessage.translate is true, we send TRANSLATED.
+                                            // If false, we send ORIGINAL.
+                                            // And "closeTicket" is true.
+
+                                            // Wait, the Prompt says: "If I didn't clcik send & trasnlate send directly what I write"
+                                            // That refers to the "Send" button (First one).
+                                            // The Green one is "Send & Close".
+                                            // Let's ensure Send & Close also respects the mode.
+
+                                            const contentToSend = pendingMessage.translate && pendingMessage.translated
+                                                ? pendingMessage.translated
+                                                : pendingMessage.original
+
+                                            await sendMessage(e as any, true, pendingMessage.translate, contentToSend)
                                             setPendingMessage(null)
                                         }
                                     }}
