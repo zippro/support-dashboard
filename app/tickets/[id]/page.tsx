@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
 import { useParams } from 'next/navigation'
-import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle, Lock } from 'lucide-react'
+import { Send, ChevronDown, MessageSquare, Languages, X, Paperclip, CheckCircle, Lock, Pencil, Check } from 'lucide-react'
 
 export default function TicketDetail() {
     const { id } = useParams()
@@ -23,6 +23,9 @@ export default function TicketDetail() {
     const [pendingMessage, setPendingMessage] = useState<{ original: string, translated: string | null, translate: boolean } | null>(null)
     const [attachment, setAttachment] = useState<File | null>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const [isEditingEmail, setIsEditingEmail] = useState(false)
+    const [editedEmail, setEditedEmail] = useState('')
+    const [savingEmail, setSavingEmail] = useState(false)
 
 
 
@@ -174,6 +177,40 @@ export default function TicketDetail() {
             console.error('Error updating status:', error)
         } else {
             setTicket((prev: any) => ({ ...prev, status: nextStatus }))
+        }
+    }
+
+    const updateUserEmail = async () => {
+        if (!ticket?.user_id || !editedEmail.trim() || !isAuthenticated) return
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        if (!emailRegex.test(editedEmail.trim())) {
+            alert('Please enter a valid email address')
+            return
+        }
+
+        setSavingEmail(true)
+        try {
+            const { error } = await supabase
+                .from('users')
+                .update({ email: editedEmail.trim() })
+                .eq('id', ticket.user_id)
+
+            if (error) {
+                console.error('Error updating email:', error)
+                alert('Failed to update email: ' + error.message)
+            } else {
+                setTicket((prev: any) => ({
+                    ...prev,
+                    users: { ...prev.users, email: editedEmail.trim() }
+                }))
+                setIsEditingEmail(false)
+            }
+        } catch (err) {
+            console.error('Error updating email:', err)
+        } finally {
+            setSavingEmail(false)
         }
     }
 
@@ -351,7 +388,56 @@ export default function TicketDetail() {
                                 )}
                             </div>
                             <div className="flex items-center flex-wrap gap-2 text-sm text-gray-500">
-                                <span>{ticket.users?.email}</span>
+                                {isEditingEmail ? (
+                                    <div className="flex items-center gap-1">
+                                        <input
+                                            type="email"
+                                            value={editedEmail}
+                                            onChange={(e) => setEditedEmail(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') updateUserEmail()
+                                                if (e.key === 'Escape') setIsEditingEmail(false)
+                                            }}
+                                            className="px-2 py-0.5 text-sm border border-indigo-300 rounded bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            autoFocus
+                                            disabled={savingEmail}
+                                        />
+                                        <button
+                                            onClick={updateUserEmail}
+                                            disabled={savingEmail}
+                                            className="p-1 text-green-600 hover:text-green-700 disabled:opacity-50"
+                                            title="Save"
+                                        >
+                                            {savingEmail ? (
+                                                <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <Check className="w-4 h-4" />
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => setIsEditingEmail(false)}
+                                            disabled={savingEmail}
+                                            className="p-1 text-gray-500 hover:text-gray-700"
+                                            title="Cancel"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <span
+                                        onClick={() => {
+                                            if (isAuthenticated) {
+                                                setEditedEmail(ticket.users?.email || '')
+                                                setIsEditingEmail(true)
+                                            }
+                                        }}
+                                        className={`flex items-center gap-1 ${isAuthenticated ? 'cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400' : ''}`}
+                                        title={isAuthenticated ? 'Click to edit email' : 'Sign in to edit'}
+                                    >
+                                        {ticket.users?.email}
+                                        {isAuthenticated && <Pencil className="w-3 h-3 opacity-50" />}
+                                    </span>
+                                )}
                                 <span>•</span>
                                 <span>{ticket.language || 'Unknown Language'}</span>
                                 {ticket.tags && ticket.tags.length > 0 && (
