@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
 import { Mail, Lock, Eye, EyeOff, LogIn } from 'lucide-react'
-import Link from 'next/link'
 
 export default function LoginPage() {
     const [email, setEmail] = useState('')
@@ -104,14 +103,7 @@ export default function LoginPage() {
                         </button>
                     </form>
 
-                    <div className="mt-6 text-center">
-                        <p className="text-gray-400">
-                            Don't have an account?{' '}
-                            <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium">
-                                Sign up
-                            </Link>
-                        </p>
-                    </div>
+                    {/* Sign up link removed - registration suspended */}
                 </div>
             </div>
         </div>
