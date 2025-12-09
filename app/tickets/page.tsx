@@ -288,11 +288,15 @@ function TicketListContent() {
             if (error) throw error
 
             if (isMounted && data) {
-                setTickets(prev => isNewFilter ? data : [...prev, ...data])
+                setTickets(prev => {
+                    const newTickets = isNewFilter ? data : [...prev, ...data]
+                    // Deduplicate by ID
+                    const uniqueTickets = Array.from(new Map(newTickets.map(item => [item.id, item])).values())
+                    return uniqueTickets
+                })
                 setTotalCount(count || 0)
                 setHasMore(data.length === ITEMS_PER_PAGE)
             }
-
         } catch (error) {
             console.error('Error fetching tickets:', error)
             if (error && typeof error === 'object') {
@@ -343,12 +347,18 @@ function TicketListContent() {
         const currentIdx = statusOrder.indexOf(currentStatus)
         const nextStatus = statusOrder[(currentIdx + 1) % statusOrder.length]
 
+        console.log(`Toggling status for ${id}: ${currentStatus} -> ${nextStatus}`)
+
         const { error } = await supabase
             .from('tickets')
             .update({ status: nextStatus })
             .eq('id', id)
 
-        if (!error) {
+        if (error) {
+            console.error('Error updating status:', error)
+            alert(`Failed to update status: ${error.message}`)
+        } else {
+            console.log('Status updated successfully')
             setTickets(prev => prev.map(t => t.id === id ? { ...t, status: nextStatus } : t))
         }
     }
