@@ -48,13 +48,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const initAuth = async () => {
             console.log('Auth: Initializing...')
 
-            // Set a timeout to prevent infinite loading
+            // Set a timeout to prevent infinite loading - reduced to 3s for faster UX
             authTimeout = setTimeout(() => {
                 if (mounted && isLoading) {
                     console.warn('Auth: Timeout - proceeding without session')
                     setIsLoading(false)
                 }
-            }, 8000) // 8 seconds max
+            }, 3000) // 3 seconds max for snappy UX
 
             try {
                 const { data, error } = await supabase.auth.getSession()
@@ -79,7 +79,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         setStoredAgentEmail(currentSession.user.email)
                     }
 
-                    // Fetch profile
+                    // Set an optimistic profile from user metadata immediately
+                    // This prevents the "User" fallback while the real profile loads
+                    const metaName = currentSession.user.user_metadata?.name ||
+                        currentSession.user.user_metadata?.full_name ||
+                        currentSession.user.email?.split('@')[0] || 'User'
+                    setProfile(prev => prev || {
+                        id: currentSession.user.id,
+                        name: metaName,
+                        email: currentSession.user.email || '',
+                        avatar_url: currentSession.user.user_metadata?.avatar_url || null
+                    })
+
+                    // Fetch actual profile (will update if different)
                     await fetchProfileSafe(currentSession.user.id)
                 }
             } catch (err) {
@@ -110,6 +122,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setAgentEmail(session.user.email)
                     setStoredAgentEmail(session.user.email)
                 }
+
+                // Set optimistic profile immediately from user metadata
+                const metaName = session.user.user_metadata?.name ||
+                    session.user.user_metadata?.full_name ||
+                    session.user.email?.split('@')[0] || 'User'
+                setProfile(prev => prev || {
+                    id: session.user.id,
+                    name: metaName,
+                    email: session.user.email || '',
+                    avatar_url: session.user.user_metadata?.avatar_url || null
+                })
 
                 await fetchProfileSafe(session.user.id)
             } else {
