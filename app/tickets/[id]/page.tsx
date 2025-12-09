@@ -538,7 +538,8 @@ export default function TicketDetail() {
                                         if (newMessage.trim() && ticket?.users?.email) {
                                             setIsTranslating(true)
                                             try {
-                                                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
+                                                // Use friendly path 'send-reply' instead of specific UUID which might change
+                                                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
                                                     method: 'POST',
                                                     headers: { 'Content-Type': 'application/json' },
                                                     body: JSON.stringify({
@@ -553,18 +554,35 @@ export default function TicketDetail() {
                                                         game_name: ticket.game_name || 'Support'
                                                     })
                                                 })
+
                                                 if (response.ok) {
-                                                    const data = await response.json()
-                                                    setPendingMessage({ original: newMessage, translated: data.message || newMessage, translate: true })
+                                                    try {
+                                                        const data = await response.json()
+                                                        setPendingMessage({ original: newMessage, translated: data.message || newMessage, translate: true })
+                                                    } catch (e) {
+                                                        console.error('Translation JSON parse error:', e)
+                                                        // Fallback to text if JSON fails but response was OK (rare but possible)
+                                                        const text = await response.text().catch(() => '')
+                                                        console.log('Raw response:', text)
+                                                        throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`)
+                                                    }
                                                 } else {
-                                                    setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
+                                                    console.error('Translation failed:', response.status, response.statusText)
+                                                    const errorText = await response.text().catch(() => '')
+                                                    console.error('Error body:', errorText)
+                                                    alert(`Translation failed: Server returned ${response.status} ${response.statusText}\n\n${errorText.substring(0, 100)}`)
+                                                    setPendingMessage(null)
+                                                    return
                                                 }
-                                            } catch (err) {
-                                                setPendingMessage({ original: newMessage, translated: newMessage, translate: true })
+                                            } catch (err: any) {
+                                                console.error('Translation error:', err)
+                                                alert(`Translation error: ${err.message || 'Failed to connect to translation server.'}`)
+                                                return
                                             } finally {
                                                 setIsTranslating(false)
-                                                setShowCloseModal(true)
                                             }
+                                            // Only open modal if we successfully set the message
+                                            setShowCloseModal(true)
                                         }
                                     }}
                                     disabled={!newMessage.trim() || isTranslating}
