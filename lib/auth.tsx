@@ -145,6 +145,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setAgentEmail(data.email)
                     setStoredAgentEmail(data.email)
                 }
+            } else {
+                console.warn('Auth: No profile found for user', userId)
+                // Attempt to create a default profile if none exists
+                const user = await supabase.auth.getUser()
+                if (user.data.user?.email) {
+                    const splitName = user.data.user.email.split('@')[0]
+                    const { data: newProfile, error: createError } = await supabase
+                        .from('agent_profiles')
+                        .insert({
+                            id: userId,
+                            email: user.data.user.email,
+                            name: splitName.charAt(0).toUpperCase() + splitName.slice(1),
+                            avatar_url: null
+                        })
+                        .select()
+                        .single()
+
+                    if (!createError && newProfile) {
+                        console.log('Auth: Created default profile')
+                        setProfile(newProfile)
+                    }
+                }
             }
         } catch (err) {
             console.error('Auth: Profile fetch exception:', err)

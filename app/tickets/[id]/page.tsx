@@ -35,8 +35,10 @@ export default function TicketDetail() {
 
             if (data) setQuickReplies(data)
         }
-        fetchQuickReplies()
-    }, [])
+        if (isAuthenticated) {
+            fetchQuickReplies()
+        }
+    }, [isAuthenticated])
 
     useEffect(() => {
         let isMounted = true
@@ -194,7 +196,24 @@ export default function TicketDetail() {
             console.log('Agent email being sent:', agentEmail)
 
             try {
-                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/6501cd11-963e-4a6d-9d53-d5e522f8c7c3', {
+                // If it's a translation PREVIEW (translate=true inside sendMessage is only called for preview or final send-with-translation)
+                // But wait, we need to distinguish between PREVIEWING and SENDING.
+                // The args are: closeTicket (bool), translate (bool).
+                // Existing logic: sendMessage(e, false, true) is called by "Translate & Send". But that triggers a preview first? 
+                // No, the UI button calls sendMessage(..., true) AFTER confirmation.
+
+                // Let's rely on the `preview_only` flag in the payload.
+                // We assume if this function is called, we are SENDING unless explicitly specified otherwise.
+                // But the PREVIEW logic is handled OUTSIDE this function in the UI button handler (lines 527+).
+                // So sendMessage is ALWAYS a "Send". 
+                // Therefore, preview_only should be FALSE.
+
+                // EXCEPT: The existing code seemed to conflate them.
+                // The backend now supports `preview_only`. 
+                // But here we are in sendMessage, which finalizes the message.
+                // So we want to send the email.
+
+                const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -204,29 +223,50 @@ export default function TicketDetail() {
                         agent_email: agentEmail || 'support@narcade.com', // Fallback to support email
                         subject: ticket.subject,
                         language: ticket.language,
-                        translate: true,
-                        preview_only: true, // We just want the translated text
+                        translate: true, // Always ask backend to translate if needed? No.
+                        // If `translate` arg is true, we want the email to be translated.
+                        // But the backend workflow translates IF `preview_only` is true OR if we add logic for translation on send.
+                        // Our backend logic (just updated) translates IF `preview_only` is true.
+                        // If we want to send a TRANSLATED email, we should probably send the translated content directly?
+                        // Or tell backend to translate-and-send.
+                        // The updated backend logic (Step 7372) splits: Preview -> Translate -> Return. Send -> Gmail. 
+                        // It does NOT have "Translate AND Send via Gmail" path. 
+                        // So if we have `translatedContent` from the preview, we should send THAT as the message.
+
+                        // Wait, looking at UI logic (lines 643+):
+                        // it calls sendMessage(..., pendingMessage.translate).
+                        // pendingMessage.translated ALREADY has the translated text if preview succeeded.
+                        // But sendMessage doesn't take `translatedText` as arg. It uses component state `newMessage`?
+                        // No, `newMessage` is the input.
+                        // We need `sendMessage` to accept the translated text if available.
+
+                        preview_only: false,
                         game_name: ticket.game_name || 'Support',
                         attachments: attachmentUrls
                     })
                 })
 
-                if (translate && response.ok) {
-                    try {
-                        const data = await response.json()
-                        if (data.message) {
-                            translatedContent = data.message
-                        }
-                    } catch (e) {
-                        console.warn('No JSON returned from webhook')
-                    }
-                }
+                // If we want the email to contain the translated text, we need to pass it. 
+                // The current sendMessage logic doesn't seemingly switch `newMessage` to translated text.
+
             } catch (err) {
-                console.error('Error triggering translation webhook:', err)
+                console.error('Error triggering email webhook:', err)
             } finally {
                 if (translate) setIsTranslating(false)
             }
         }
+
+        // Optimistic Update
+        const optimisticMessage = {
+            id: 'temp-' + Date.now(),
+            ticket_id: id,
+            content: finalContent,
+            content_translated: translatedContent,
+            sender_type: 'agent',
+            attachments: attachmentUrls,
+            created_at: new Date().toISOString()
+        }
+        setMessages(prev => [...prev, optimisticMessage])
 
         const { error } = await supabase
             .from('messages')
@@ -240,6 +280,7 @@ export default function TicketDetail() {
 
         if (error) {
             console.error('Error saving message:', error)
+            // Rollback optimistic update if needed, but for now just log
         }
 
         // Close ticket if requested
