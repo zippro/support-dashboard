@@ -288,6 +288,7 @@ export default function TicketDetail() {
         }
 
         // Optimistic Update
+        const agentName = profile?.name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Agent'
         const optimisticMessage = {
             id: 'temp-' + Date.now(),
             ticket_id: id,
@@ -295,6 +296,7 @@ export default function TicketDetail() {
             content_translated: translate ? explicitContent : null,
             sender_type: 'agent',
             attachments: attachmentUrls,
+            agent_name: agentName,
             created_at: new Date().toISOString()
         }
         setMessages(prev => [...prev, optimisticMessage])
@@ -306,7 +308,8 @@ export default function TicketDetail() {
                 content: newMessage,
                 content_translated: translate ? explicitContent : null,
                 sender_type: 'agent',
-                attachments: attachmentUrls
+                attachments: attachmentUrls,
+                agent_name: agentName
             })
 
         if (error) {
@@ -543,7 +546,7 @@ export default function TicketDetail() {
 
                                     <div className={`text-[10px] mt-1.5 opacity-70 ${isAgent ? 'text-indigo-100' : 'text-gray-400'}`}>
                                         {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        {isAgent ? ` • ${user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Agent'}` : ' • User'}
+                                        {isAgent ? ` • ${message.agent_name || 'Agent'}` : ' • User'}
                                     </div>
                                 </div>
                             </div>
