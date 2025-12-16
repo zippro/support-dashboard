@@ -273,7 +273,7 @@ export default function TicketDetail() {
                         agent_email: user?.email || 'support@narcade.com', // Fallback to support email
                         subject: ticket.subject,
                         language: ticket.language,
-                        translate: translate, // correct flag based on action
+                        translate: translate && !explicitContent, // if we have explicit content (like translated text), we don't need backend to translate it again
                         preview_only: false, // Ensure we are SENDING
                         game_name: ticket.game_name || 'Support',
                         attachments: attachmentUrls
@@ -545,7 +545,7 @@ export default function TicketDetail() {
                                     )}
 
                                     <div className={`text-[10px] mt-1.5 opacity-70 ${isAgent ? 'text-indigo-100' : 'text-gray-400'}`}>
-                                        {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        {new Date(message.created_at).toLocaleDateString([], { year: 'numeric', month: 'numeric', day: 'numeric' })} {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         {isAgent ? ` • ${message.agent_name || 'Agent'}` : ' • User'}
                                     </div>
                                 </div>
@@ -783,7 +783,56 @@ export default function TicketDetail() {
                                         <div>
                                             <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">Translated Message</p>
                                             <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
-                                                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{pendingMessage.translated}</p>
+                                                <textarea
+                                                    value={pendingMessage.translated || ''}
+                                                    onChange={(e) => pendingMessage && setPendingMessage({ ...pendingMessage, translated: e.target.value })}
+                                                    className="w-full bg-transparent border-none focus:ring-0 text-sm text-gray-700 dark:text-gray-300 resize-none p-0"
+                                                    rows={4}
+                                                />
+                                            </div>
+                                            <div className="flex justify-end mt-2">
+                                                <button
+                                                    onClick={async () => {
+                                                        if (!pendingMessage.original) return
+                                                        setIsTranslating(true)
+                                                        try {
+                                                            const messageHtml = pendingMessage.original.replace(/\n/g, '<br>')
+                                                            const response = await fetch('https://zipmcp.app.n8n.cloud/webhook/send-reply', {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    ticket_id: id,
+                                                                    message: messageHtml,
+                                                                    user_email: ticket.users.email,
+                                                                    agent_email: user?.email || 'support@narcade.com',
+                                                                    subject: ticket.subject,
+                                                                    language: ticket.language,
+                                                                    translate: true,
+                                                                    preview_only: true, // Re-translate is also preview only
+                                                                    game_name: ticket.game_name || 'Support'
+                                                                })
+                                                            })
+
+                                                            if (response.ok) {
+                                                                const data = await response.json()
+                                                                let translatedText = data.message || data.output || data.text || data.result || data.content || pendingMessage.original
+                                                                if (translatedText) {
+                                                                    translatedText = translatedText.replace(/<br\s*\/?>/gi, '\n')
+                                                                }
+                                                                setPendingMessage(prev => prev ? { ...prev, translated: translatedText } : null)
+                                                            }
+                                                        } catch (err) {
+                                                            console.error('Retranslation error:', err)
+                                                        } finally {
+                                                            setIsTranslating(false)
+                                                        }
+                                                    }}
+                                                    disabled={isTranslating}
+                                                    className="text-xs text-purple-600 hover:text-purple-700 font-medium flex items-center gap-1 disabled:opacity-50"
+                                                >
+                                                    <Languages className="h-3 w-3" />
+                                                    {isTranslating ? 'Translating...' : 'Retranslate'}
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -803,12 +852,21 @@ export default function TicketDetail() {
                                 <button
                                     onClick={async (e) => {
                                         if (pendingMessage) {
+                                            // Calculate content BEFORE state updates
+                                            const contentToSend = pendingMessage.translate && pendingMessage.translated
+                                                ? pendingMessage.translated
+                                                : pendingMessage.original
+
+                                            // Send message first
+                                            await sendMessage(e as any, false, pendingMessage.translate, contentToSend)
+
+                                            // Then close and clear
                                             setShowCloseModal(false)
-                                            await sendMessage(e as any, false, false, pendingMessage.original)
                                             setPendingMessage(null)
                                         }
                                     }}
-                                    className={`flex-1 px-4 py-2.5 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 ${pendingMessage?.translate ? 'bg-purple-600 hover:bg-purple-700' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                                    disabled={isTranslating}
+                                    className={`flex-1 px-4 py-2.5 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 ${pendingMessage?.translate ? 'bg-purple-600 hover:bg-purple-700' : 'bg-indigo-600 hover:bg-indigo-700'} ${isTranslating ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     {pendingMessage?.translate ? <Languages className="h-4 w-4" /> : <Send className="h-4 w-4" />}
                                     Send
@@ -816,30 +874,21 @@ export default function TicketDetail() {
                                 <button
                                     onClick={async (e) => {
                                         if (pendingMessage) {
-                                            setShowCloseModal(false)
-                                            // Determine context: if it was a translate request (pendingMessage.translate=true),
-                                            // we likely want to send the TRANSLATION.
-                                            // But wait, this second button is "Send & Close".
-                                            // The user might want to send Original or Translated depending on the mode.
-                                            // Let's stick to the mode logic:
-                                            // If pendingMessage.translate is true, we send TRANSLATED.
-                                            // If false, we send ORIGINAL.
-                                            // And "closeTicket" is true.
-
-                                            // Wait, the Prompt says: "If I didn't clcik send & trasnlate send directly what I write"
-                                            // That refers to the "Send" button (First one).
-                                            // The Green one is "Send & Close".
-                                            // Let's ensure Send & Close also respects the mode.
-
+                                            // Calculate content BEFORE state updates
                                             const contentToSend = pendingMessage.translate && pendingMessage.translated
                                                 ? pendingMessage.translated
                                                 : pendingMessage.original
 
+                                            // Send message first
                                             await sendMessage(e as any, true, pendingMessage.translate, contentToSend)
+
+                                            // Then close and clear
+                                            setShowCloseModal(false)
                                             setPendingMessage(null)
                                         }
                                     }}
-                                    className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+                                    disabled={isTranslating}
+                                    className={`flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2 ${isTranslating ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 >
                                     <CheckCircle className="h-4 w-4" />
                                     Send & Close
