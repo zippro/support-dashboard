@@ -46,7 +46,7 @@ interface ReportSetting {
     timezone?: string
 }
 
-type TabType = 'games' | 'tags' | 'replies' | 'ai' | 'alerts' | 'reports'
+type TabType = 'games' | 'channels' | 'tags' | 'replies' | 'ai' | 'alerts' | 'reports'
 
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<TabType>('games')
@@ -92,6 +92,15 @@ export default function SettingsPage() {
     const [reportSettings, setReportSettings] = useState<ReportSetting[]>([])
     const [sendingReport, setSendingReport] = useState(false)
 
+    // Discord Channels state
+    const [discordChannels, setDiscordChannels] = useState<{ id: string, game_name: string, webhook_url: string }[]>([])
+    const [newChannelGame, setNewChannelGame] = useState('')
+    const [newChannelUrl, setNewChannelUrl] = useState('')
+    const [addingChannel, setAddingChannel] = useState(false)
+    const [editingChannel, setEditingChannel] = useState<string | null>(null)
+    const [editChannelGame, setEditChannelGame] = useState('')
+    const [editChannelUrl, setEditChannelUrl] = useState('')
+
     useEffect(() => {
         fetchProjects()
         fetchQuickReplies()
@@ -99,7 +108,57 @@ export default function SettingsPage() {
         fetchImportanceSettings()
         fetchAlertSettings()
         fetchReportSettings()
+        fetchDiscordChannels()
     }, [])
+
+    async function fetchDiscordChannels() {
+        try {
+            const { data, error } = await publicSupabase.from('game_discord_channels').select('*').order('created_at', { ascending: false })
+            if (error) throw error
+            setDiscordChannels(data || [])
+        } catch (err) {
+            console.error('Error fetching discord channels:', err)
+        }
+    }
+
+    async function addDiscordChannel(e: React.FormEvent) {
+        e.preventDefault()
+        if (!newChannelGame.trim() || !newChannelUrl.trim()) return
+        try {
+            setAddingChannel(true)
+            const { data, error } = await supabase.from('game_discord_channels').insert({ game_name: newChannelGame.trim(), webhook_url: newChannelUrl.trim() }).select().single()
+            if (error) throw error
+            setDiscordChannels([data, ...discordChannels])
+            setNewChannelGame('')
+            setNewChannelUrl('')
+        } catch (err: any) {
+            alert('Failed to add channel: ' + err.message)
+        } finally {
+            setAddingChannel(false)
+        }
+    }
+
+    async function updateDiscordChannel(id: string) {
+        try {
+            const { error } = await supabase.from('game_discord_channels').update({ game_name: editChannelGame.trim(), webhook_url: editChannelUrl.trim() }).eq('id', id)
+            if (error) throw error
+            setDiscordChannels(discordChannels.map(c => c.id === id ? { ...c, game_name: editChannelGame.trim(), webhook_url: editChannelUrl.trim() } : c))
+            setEditingChannel(null)
+        } catch (err: any) {
+            alert('Failed to update channel: ' + err.message)
+        }
+    }
+
+    async function deleteDiscordChannel(id: string) {
+        if (!confirm('Delete this channel mapping?')) return
+        try {
+            const { error } = await supabase.from('game_discord_channels').delete().eq('id', id)
+            if (error) throw error
+            setDiscordChannels(discordChannels.filter(c => c.id !== id))
+        } catch (err: any) {
+            alert('Failed to delete channel: ' + err.message)
+        }
+    }
 
     async function fetchTags() {
         try {
@@ -573,6 +632,7 @@ export default function SettingsPage() {
 
     const tabs = [
         { id: 'games' as TabType, label: 'Games', icon: Gamepad2, count: projects.length },
+        { id: 'channels' as TabType, label: 'Discord Channels', icon: MessageSquare, count: discordChannels.length },
         { id: 'tags' as TabType, label: 'Tags', icon: Tag, count: tags.length },
         { id: 'replies' as TabType, label: 'Quick Replies', icon: MessageSquare, count: quickReplies.length },
         { id: 'ai' as TabType, label: 'AI Settings', icon: Settings, count: null },
@@ -640,6 +700,72 @@ export default function SettingsPage() {
                                                     <div className="flex items-center gap-1">
                                                         <button onClick={() => { setEditingProject(project.id); setEditGameName(project.game_name) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
                                                         <button onClick={() => deleteProject(project.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Discord Channels Tab */}
+                {activeTab === 'channels' && (
+                    <div className="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-800">
+                        <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Discord Channel Routing</h2>
+                            <p className="text-sm text-gray-500 mt-1">Route tickets to specific Discord channels based on the game</p>
+                        </div>
+                        <div className="p-6">
+                            {isAuthenticated && (
+                                <form onSubmit={addDiscordChannel} className="flex gap-4 mb-6">
+                                    <div className="relative">
+                                        <select
+                                            value={newChannelGame}
+                                            onChange={(e) => setNewChannelGame(e.target.value)}
+                                            className="w-64 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Select a game...</option>
+                                            {projects
+                                                .filter(p => !discordChannels.some(c => c.game_name === p.game_name))
+                                                .map(p => (
+                                                    <option key={p.id} value={p.game_name}>
+                                                        {p.game_name}
+                                                    </option>
+                                                ))}
+                                        </select>
+                                        <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                                        </div>
+                                    </div>
+                                    <input type="text" value={newChannelUrl} onChange={(e) => setNewChannelUrl(e.target.value)} placeholder="Discord Webhook URL" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                    <button type="submit" disabled={addingChannel || !newChannelGame || !newChannelUrl} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
+                                </form>
+                            )}
+                            <div className="space-y-2">
+                                {discordChannels.length === 0 ? <div className="text-center py-8 text-gray-500">No channels configured. All tickets go to default.</div> : discordChannels.map((channel) => (
+                                    <div key={channel.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        {editingChannel === channel.id ? (
+                                            <div className="flex items-center gap-3 flex-1">
+                                                <input type="text" value={editChannelGame} onChange={(e) => setEditChannelGame(e.target.value)} placeholder="Game Name" className="w-48 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                                <input type="text" value={editChannelUrl} onChange={(e) => setEditChannelUrl(e.target.value)} placeholder="Webhook URL" className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
+                                                <button onClick={() => updateDiscordChannel(channel.id)} className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg"><Check className="w-4 h-4" /></button>
+                                                <button onClick={() => setEditingChannel(null)} className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X className="w-4 h-4" /></button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div className="flex-1 min-w-0 mr-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-medium text-gray-900 dark:text-white whitespace-nowrap">{channel.game_name}</span>
+                                                        <span className="text-xs text-gray-400 font-mono truncate">{channel.webhook_url}</span>
+                                                    </div>
+                                                </div>
+                                                {isAuthenticated && (
+                                                    <div className="flex items-center gap-1">
+                                                        <button onClick={() => { setEditingChannel(channel.id); setEditChannelGame(channel.game_name); setEditChannelUrl(channel.webhook_url) }} className="p-2 text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-lg transition-colors"><Pencil className="w-4 h-4" /></button>
+                                                        <button onClick={() => deleteDiscordChannel(channel.id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
                                                     </div>
                                                 )}
                                             </>

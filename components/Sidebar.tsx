@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Home, Inbox, Settings, BarChart2, LogIn, LogOut, User } from 'lucide-react'
+import { Home, Inbox, Settings, BarChart2, LogIn, LogOut, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -20,8 +20,13 @@ const navigation = [
 export function Sidebar() {
     const pathname = usePathname()
     const [openTicketCount, setOpenTicketCount] = useState(0)
-    const { isAuthenticated, profile, user, signOut, isLoading, session } = useAuth()
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+    const { isAuthenticated, profile, user, signOut, isLoading } = useAuth()
 
+
+    useEffect(() => {
+        setIsMobileMenuOpen(false)
+    }, [pathname])
 
     useEffect(() => {
         // Skip fetching if on login/register pages
@@ -62,8 +67,8 @@ export function Sidebar() {
         return null
     }
 
-    return (
-        <div className="flex h-full w-72 flex-col bg-black border-r border-gray-800 text-white shadow-xl">
+    const SidebarContent = () => (
+        <div className="flex h-full flex-col bg-black border-r border-gray-800 text-white shadow-xl">
             <div className="flex h-20 items-center px-6 border-b border-gray-800 bg-black/50 backdrop-blur-sm">
                 <div className="relative h-14 w-full">
                     <Image
@@ -75,8 +80,6 @@ export function Sidebar() {
                     />
                 </div>
             </div>
-
-
 
             <nav className="flex-1 space-y-2 px-4 py-6">
                 {navigation.map((item) => {
@@ -149,5 +152,52 @@ export function Sidebar() {
                 )}
             </div>
         </div>
+    )
+
+    return (
+        <>
+            {/* Mobile Header */}
+            <div className="flex md:hidden h-16 w-full items-center justify-between bg-black px-4 border-b border-gray-800 shrink-0">
+                <div className="relative h-8 w-32">
+                    <Image
+                        src="/narcade-logo-v2.png"
+                        alt="Narcade Support"
+                        fill
+                        className="object-contain object-left"
+                        priority
+                    />
+                </div>
+                <button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="p-2 text-gray-400 hover:text-white"
+                >
+                    {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+            </div>
+
+            {/* Mobile Drawer */}
+            {isMobileMenuOpen && (
+                <div className="fixed inset-0 z-50 md:hidden flex">
+                    <div
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                    />
+                    <div className="relative w-72 h-full bg-black shadow-2xl">
+                        <SidebarContent />
+                        <button
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="absolute right-4 top-4 p-2 text-gray-400 hover:text-white md:hidden"
+                        >
+                            <X className="h-6 w-6" />
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Desktop Sidebar */}
+            <div className="hidden md:flex h-full w-72 flex-col shrink-0">
+                <SidebarContent />
+            </div>
+        </>
     )
 }

@@ -983,6 +983,12 @@ export default function TicketDetail() {
                                 {ticket.device_id || 'N/A'}
                             </span>
                         </div>
+                        <div className="flex flex-col mt-2">
+                            <span className="text-gray-500 text-xs mb-1">Nakama User ID:</span>
+                            <span className="text-gray-900 dark:text-white font-mono text-[10px] break-all bg-gray-50 dark:bg-gray-800 p-1 rounded">
+                                {ticket.nakama_user_id || 'N/A'}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
