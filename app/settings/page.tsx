@@ -642,7 +642,7 @@ export default function SettingsPage() {
 
     return (
         <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
-            <div className="max-w-5xl mx-auto p-8">
+            <div className="max-w-5xl mx-auto p-4 md:p-8">
                 <div className="mb-8">
                     <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
                     <p className="text-gray-500 dark:text-gray-400 mt-1">Manage your support system configuration</p>
@@ -655,9 +655,9 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Tab Navigation */}
-                <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-800 pb-4">
+                <div className="flex gap-2 mb-6 border-b border-gray-200 dark:border-gray-800 pb-4 overflow-x-auto no-scrollbar">
                     {tabs.map((tab) => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800'}`}>
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25' : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-800'}`}>
                             <tab.icon className="w-4 h-4" />
                             {tab.label}
                             {tab.count !== null && <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 dark:bg-gray-800'}`}>{tab.count}</span>}
@@ -674,7 +674,7 @@ export default function SettingsPage() {
                         </div>
                         <div className="p-6">
                             {isAuthenticated && (
-                                <form onSubmit={addProject} className="flex gap-4 mb-6">
+                                <form onSubmit={addProject} className="flex flex-col md:flex-row gap-4 mb-6">
                                     <input type="text" value={newProjectId} onChange={(e) => setNewProjectId(e.target.value)} placeholder="Project ID (e.g. b7ac7b87-62fc-...)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                                     <input type="text" value={newGameName} onChange={(e) => setNewGameName(e.target.value)} placeholder="Game Name" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                                     <button type="submit" disabled={adding || !newProjectId || !newGameName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
@@ -683,7 +683,7 @@ export default function SettingsPage() {
                             {error && <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>}
                             <div className="space-y-2">
                                 {loading ? <div className="text-center py-8 text-gray-500">Loading...</div> : projects.length === 0 ? <div className="text-center py-8 text-gray-500">No games mapped yet</div> : projects.map((project) => (
-                                    <div key={project.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                    <div key={project.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                                         {editingProject === project.id ? (
                                             <div className="flex items-center gap-3 flex-1">
                                                 <input type="text" value={editGameName} onChange={(e) => setEditGameName(e.target.value)} className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
@@ -720,7 +720,7 @@ export default function SettingsPage() {
                         </div>
                         <div className="p-6">
                             {isAuthenticated && (
-                                <form onSubmit={addDiscordChannel} className="flex gap-4 mb-6">
+                                <form onSubmit={addDiscordChannel} className="flex flex-col md:flex-row gap-4 mb-6">
                                     <div className="relative">
                                         <select
                                             value={newChannelGame}
@@ -746,7 +746,7 @@ export default function SettingsPage() {
                             )}
                             <div className="space-y-2">
                                 {discordChannels.length === 0 ? <div className="text-center py-8 text-gray-500">No channels configured. All tickets go to default.</div> : discordChannels.map((channel) => (
-                                    <div key={channel.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                    <div key={channel.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                                         {editingChannel === channel.id ? (
                                             <div className="flex items-center gap-3 flex-1">
                                                 <input type="text" value={editChannelGame} onChange={(e) => setEditChannelGame(e.target.value)} placeholder="Game Name" className="w-48 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
@@ -786,7 +786,7 @@ export default function SettingsPage() {
                         </div>
                         <div className="p-6">
                             {isAuthenticated && (
-                                <form onSubmit={addTag} className="flex gap-4 mb-6">
+                                <form onSubmit={addTag} className="flex flex-col md:flex-row gap-4 mb-6">
                                     <input type="text" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} placeholder="Tag name (e.g. Billing)" className="w-48 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                                     <input type="text" value={newTagKeywords} onChange={(e) => setNewTagKeywords(e.target.value)} placeholder="Keywords (comma separated)" className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />
                                     <button type="submit" disabled={addingTag || !newTagName} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"><Plus className="w-4 h-4" /> Add</button>
@@ -794,7 +794,7 @@ export default function SettingsPage() {
                             )}
                             <div className="space-y-2">
                                 {tags.length === 0 ? <div className="text-center py-8 text-gray-500">No tags defined</div> : tags.map((tag) => (
-                                    <div key={tag.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                    <div key={tag.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
                                         {editingTag === tag.id ? (
                                             <div className="flex items-center gap-3 flex-1">
                                                 <input type="text" value={editTagName} onChange={(e) => setEditTagName(e.target.value)} placeholder="Tag name" className="w-32 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-white" />

@@ -244,7 +244,12 @@ export default function TicketDetail() {
 
         // Logic to construct final message: Prefer explicit content (e.g. translated text) if provided
         let finalContent = explicitContent || newMessage
-        let translatedContent = translate ? explicitContent : null // If translating, the content IS the translation
+
+        if (translate && ticket.language) {
+            finalContent += `\n\n(Translated to ${ticket.language})`
+        }
+
+        let translatedContent = translate ? finalContent : null // If translating, the content IS the translation
 
         // Translation Logic
         // We trigger the webhook if there is content to send.
@@ -352,9 +357,9 @@ export default function TicketDetail() {
     }
 
     return (
-        <div className="flex h-full">
+        <div className="flex flex-col lg:flex-row h-full">
             {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col border-r border-gray-200 dark:border-gray-800 relative">
+            <div className="flex-1 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-800 relative min-h-[500px] lg:min-h-0">
                 {/* Loading Overlay */}
                 {isTranslating && (
                     <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 flex items-center justify-center z-50 backdrop-blur-[2px] rounded-lg">
@@ -900,7 +905,7 @@ export default function TicketDetail() {
             </div>
 
             {/* Sidebar for Game Data */}
-            <div className="w-80 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 overflow-y-auto p-4">
+            <div className="w-full lg:w-80 bg-white dark:bg-gray-900 lg:border-l border-gray-200 dark:border-gray-800 overflow-y-auto p-4 h-auto lg:h-full shrink-0">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{ticket.game_name || 'Game Data'}</h2>
                     {ticket.project_id && ticket.unity_report_id && (

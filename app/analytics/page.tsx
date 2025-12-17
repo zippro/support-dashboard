@@ -138,17 +138,17 @@ export default function AnalyticsPage() {
     return (
         <div className="h-full overflow-y-auto bg-gray-50 dark:bg-gray-950">
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-8 py-4">
-                <div className="flex items-center justify-between">
+            <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 px-4 md:px-8 py-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Analytics</h1>
                         <p className="text-sm text-gray-500 mt-1">Deep insights into support performance</p>
                     </div>
                     <div className="flex items-center gap-4">
                         {/* Date Range Selector */}
-                        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+                        <div className="flex flex-wrap items-center gap-2 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
                             {(['7d', '30d', '90d', '12m', 'all'] as DateRange[]).map(r => (
-                                <button key={r} onClick={() => setDateRange(r)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${dateRange === r ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                                <button key={r} onClick={() => setDateRange(r)} className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${dateRange === r ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                                     {r === '7d' ? '7 Days' : r === '30d' ? '30 Days' : r === '90d' ? '90 Days' : r === '12m' ? '12 Months' : 'All Time'}
                                 </button>
                             ))}
@@ -157,7 +157,7 @@ export default function AnalyticsPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 mt-4 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl w-fit">
+                <div className="flex gap-2 mt-4 bg-gray-100 dark:bg-gray-800 p-1.5 rounded-xl w-full md:w-fit overflow-x-auto no-scrollbar">
                     {(['overview', 'efficiency', 'trends'] as Tab[]).map(t => (
                         <button
                             key={t}

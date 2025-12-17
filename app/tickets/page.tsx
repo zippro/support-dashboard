@@ -462,8 +462,8 @@ function TicketListContent() {
     return (
         <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-950">
             {/* Header & Actions */}
-            <div className="flex flex-col gap-4 p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 p-4 md:p-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+                <div className="columns-1 flex items-center justify-between">
                     <div>
                         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Tickets</h1>
                         <p className="text-gray-500 dark:text-gray-400">
@@ -617,9 +617,9 @@ function TicketListContent() {
                 </div>
             </div>
 
-            {/* Table Container */}
-            <div className="flex-1 bg-white dark:bg-gray-900 shadow-sm border-t border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
-                <div className="overflow-x-auto flex-1">
+            {/* Table Container - Desktop */}
+            <div className="hidden md:flex flex-col flex-1 bg-white dark:bg-gray-900 shadow-sm border-t border-gray-200 dark:border-gray-800 overflow-hidden">
+                <div className="overflow-x-auto flex-1 h-full">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
                         <thead className="bg-gray-50 dark:bg-gray-950 sticky top-0 z-10">
                             <tr>
@@ -768,6 +768,75 @@ function TicketListContent() {
                 </div>
             </div>
 
+            {/* Mobile List View - Cards */}
+            <div className="md:hidden flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 dark:bg-gray-950">
+                {tickets.length === 0 && !loading ? (
+                    <div className="text-center py-12 text-gray-500 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800">
+                        No tickets found
+                    </div>
+                ) : (
+                    tickets.map((ticket) => (
+                        <Link
+                            key={ticket.id}
+                            href={`/tickets/${ticket.id}`}
+                            className="block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 shadow-sm active:scale-[0.99] transition-transform"
+                        >
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <span
+                                        className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium"
+                                        style={{
+                                            backgroundColor: `hsl(${getGameColor(ticket.project_id)}, 70%, 90%)`,
+                                            color: `hsl(${getGameColor(ticket.project_id)}, 80%, 30%)`,
+                                        }}
+                                    >
+                                        {getGameName(ticket.project_id)}
+                                    </span>
+                                    <span className="text-xs text-gray-400">#{ticket.ticket_id}</span>
+                                </div>
+                                <span className={`
+                                    text-xs font-medium px-2 py-0.5 rounded-full border
+                                    ${ticket.status === 'open' ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800' :
+                                        ticket.status === 'closed' ? 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700' :
+                                            ticket.status === 'duplicated' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800' :
+                                                'bg-yellow-50 text-yellow-700 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800'}
+                                `}>
+                                    {ticket.status}
+                                </span>
+                            </div>
+
+                            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1 line-clamp-2">
+                                {ticket.subject}
+                            </h3>
+
+                            <div className="flex items-center gap-2 mb-3 text-xs text-gray-500 truncate">
+                                <span>{ticket.users?.email || 'Unknown'}</span>
+                            </div>
+
+                            <div className="flex items-center justify-between text-xs text-gray-400 pt-3 border-t border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1">
+                                    <div
+                                        className={`w-2 h-2 rounded-full ${ticket.importance === 'important' ? 'bg-red-500' : 'bg-gray-300'}`}
+                                    />
+                                    <span>{ticket.importance === 'important' ? 'Important' : 'Normal'}</span>
+                                </div>
+                                <span>{new Date(ticket.created_at).toLocaleDateString()}</span>
+                            </div>
+                        </Link>
+                    ))
+                )}
+
+                {/* Mobile Loading Skeleton */}
+                {(loading || loadingMore) && (
+                    <div className="py-4 text-center">
+                        <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-indigo-600 border-t-transparent"></div>
+                    </div>
+                )}
+
+                {/* Observer Target for Infinite Scroll */}
+                <div ref={observerTarget} className="h-4 w-full" />
+            </div>
+
             <style jsx>{`
                 @keyframes marquee {
                     0% { transform: translateX(0); }
@@ -785,59 +854,63 @@ function TicketListContent() {
             `}</style>
 
             {/* Login Required Modal */}
-            {showLoginModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowLoginModal(false)}>
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
-                        <div className="text-center">
-                            <div className="mx-auto w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-4">
-                                <Lock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Login Required</h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">You need to sign in to change ticket status or perform bulk actions.</p>
-                            <div className="flex gap-3">
-                                <button onClick={() => setShowLoginModal(false)} className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-                                    Cancel
-                                </button>
-                                <Link href="/login" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-center">
-                                    Sign In
-                                </Link>
+            {
+                showLoginModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowLoginModal(false)}>
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-800" onClick={e => e.stopPropagation()}>
+                            <div className="text-center">
+                                <div className="mx-auto w-12 h-12 bg-yellow-100 dark:bg-yellow-900/30 rounded-full flex items-center justify-center mb-4">
+                                    <Lock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Login Required</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">You need to sign in to change ticket status or perform bulk actions.</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowLoginModal(false)} className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+                                        Cancel
+                                    </button>
+                                    <Link href="/login" className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-center">
+                                        Sign In
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Delete Confirmation Modal */}
-            {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-800 animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
-                        <div className="text-center">
-                            <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
-                                <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete {selectedTickets.size} Tickets?</h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                                This action cannot be undone. These tickets will be permanently removed.
-                            </p>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowDeleteModal(false)}
-                                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={confirmDelete}
-                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm hover:shadow"
-                                >
-                                    Delete
-                                </button>
+            {
+                showDeleteModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowDeleteModal(false)}>
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 max-w-sm w-full shadow-xl border border-gray-200 dark:border-gray-800 animate-in fade-in zoom-in duration-200" onClick={e => e.stopPropagation()}>
+                            <div className="text-center">
+                                <div className="mx-auto w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
+                                    <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete {selectedTickets.size} Tickets?</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                                    This action cannot be undone. These tickets will be permanently removed.
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowDeleteModal(false)}
+                                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={confirmDelete}
+                                        className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium shadow-sm hover:shadow"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     )
 }
 
