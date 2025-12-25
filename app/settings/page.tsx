@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { publicSupabase } from '@/lib/supabase-public'
 import { useAuth } from '@/lib/auth'
-import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send, FileText, Calendar, Mail } from 'lucide-react'
+import { Trash2, Plus, Gamepad2, Tag, Settings, MessageSquare, Pencil, X, Check, Lock, Bell, Send, FileText, Calendar, Mail, Clock, AlertTriangle } from 'lucide-react'
 
 interface Project {
     id: string
@@ -1037,6 +1037,86 @@ export default function SettingsPage() {
                                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${alertSettings.find(s => s.key === 'tag_spike_alert')?.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`}
                                         >
                                             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertSettings.find(s => s.key === 'tag_spike_alert')?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Auto Close Tickets */}
+                                {alertSettings.find(s => s.key === 'auto_close_unimportant') && (
+                                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                                                <Trash2 className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium text-gray-900 dark:text-white">Auto Close Non-Important</h3>
+                                                <p className="text-sm text-gray-500 mt-1">Automatically close non-important tickets after {alertSettings.find(s => s.key === 'auto_close_unimportant')?.threshold} days</p>
+                                                <div className="flex items-center gap-4 mt-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Close after:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'auto_close_unimportant')?.threshold || 5}
+                                                            onChange={(e) => updateAlertSetting('auto_close_unimportant', { threshold: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                        <span className="text-xs text-gray-500">days</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateAlertSetting('auto_close_unimportant', { enabled: !alertSettings.find(s => s.key === 'auto_close_unimportant')?.enabled })}
+                                            disabled={!isAuthenticated}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${alertSettings.find(s => s.key === 'auto_close_unimportant')?.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertSettings.find(s => s.key === 'auto_close_unimportant')?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Stale Important Alert */}
+                                {alertSettings.find(s => s.key === 'stale_important_alert') && (
+                                    <div className="flex items-start justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+                                                <Clock className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-medium text-gray-900 dark:text-white">Stale Important Ticket Alert</h3>
+                                                <p className="text-sm text-gray-500 mt-1">Alert when an important ticket is open for {alertSettings.find(s => s.key === 'stale_important_alert')?.threshold}+ days</p>
+                                                <div className="flex flex-col gap-3 mt-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-xs text-gray-500">Alert after:</label>
+                                                        <input
+                                                            type="number"
+                                                            value={alertSettings.find(s => s.key === 'stale_important_alert')?.threshold || 7}
+                                                            onChange={(e) => updateAlertSetting('stale_important_alert', { threshold: parseInt(e.target.value) })}
+                                                            disabled={!isAuthenticated}
+                                                            className="w-16 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                        <span className="text-xs text-gray-500">days</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 w-full max-w-md">
+                                                        <input
+                                                            type="text"
+                                                            value={alertSettings.find(s => s.key === 'stale_important_alert')?.webhook_url || ''}
+                                                            onChange={(e) => updateAlertSetting('stale_important_alert', { webhook_url: e.target.value })}
+                                                            placeholder="Discord Webhook URL for Stale Alerts"
+                                                            disabled={!isAuthenticated}
+                                                            className="flex-1 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => updateAlertSetting('stale_important_alert', { enabled: !alertSettings.find(s => s.key === 'stale_important_alert')?.enabled })}
+                                            disabled={!isAuthenticated}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-50 ${alertSettings.find(s => s.key === 'stale_important_alert')?.enabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'}`}
+                                        >
+                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${alertSettings.find(s => s.key === 'stale_important_alert')?.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
                                         </button>
                                     </div>
                                 )}
