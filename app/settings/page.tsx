@@ -1103,7 +1103,7 @@ export default function SettingsPage() {
                                                             type="text"
                                                             value={alertSettings.find(s => s.key === 'stale_important_alert')?.webhook_url || ''}
                                                             onChange={(e) => updateAlertSetting('stale_important_alert', { webhook_url: e.target.value })}
-                                                            placeholder="Discord Webhook URL for Stale Alerts"
+                                                            placeholder="Webhook URL (Optional - uses Daily Report webhook if empty)"
                                                             disabled={!isAuthenticated}
                                                             className="flex-1 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-700 disabled:opacity-50"
                                                         />
