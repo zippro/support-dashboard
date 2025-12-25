@@ -566,6 +566,11 @@ export default function TicketDetail() {
                                         {new Date(message.created_at).toLocaleDateString([], { year: 'numeric', month: 'numeric', day: 'numeric' })} {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         {isAgent ? ` • ${message.agent_name || 'Agent'}` : ' • User'}
                                     </div>
+                                    {isAgent && message.content_translated && ticket.language && ticket.language.toLowerCase() !== 'english' && (
+                                        <div className="text-[9px] mt-0.5 opacity-60 text-indigo-200">
+                                            Translated to {ticket.language}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )
