@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Plus, GripVertical, Trash2, Bug, Sparkles, ChevronDown, ChevronUp, CheckCircle2, Pencil, Check, X, Package } from 'lucide-react'
+import { Plus, GripVertical, Trash2, Bug, Sparkles, ChevronDown, ChevronUp, CheckCircle2, Pencil, Check, X, Package, RotateCcw } from 'lucide-react'
 
 interface TodoItem {
     id: string
@@ -88,6 +88,11 @@ export default function UpdatesPage() {
         setVersions(versions.map(v => v.id === id ? { ...v, done: true, todos: v.todos.map(t => ({ ...t, done: true })) } : v))
     }
 
+    // Mark version as undone
+    const markVersionUndone = (id: string) => {
+        setVersions(versions.map(v => v.id === id ? { ...v, done: false } : v))
+    }
+
     // Add todo to version
     const addTodoToVersion = (versionId: string, type: 'new' | 'bug', title: string) => {
         if (!title.trim()) return
@@ -110,8 +115,8 @@ export default function UpdatesPage() {
             setVersions(versions.map(v => {
                 if (v.id !== versionId) return v
                 const updatedTodos = v.todos.map(t => t.id === todoId ? { ...t, done: !t.done } : t)
-                const allDone = updatedTodos.length > 0 && updatedTodos.every(t => t.done)
-                return { ...v, todos: updatedTodos, done: allDone }
+                // Removed auto-done logic: done status is now manual only
+                return { ...v, todos: updatedTodos }
             }))
         } else {
             setBacklog(backlog.map(t => t.id === todoId ? { ...t, done: !t.done } : t))
@@ -332,6 +337,7 @@ export default function UpdatesPage() {
                         <DoneSection
                             doneVersions={doneVersions}
                             onDeleteVersion={deleteVersion}
+                            onMarkUndone={markVersionUndone}
                         />
                     </div>
                 </div>
@@ -670,9 +676,11 @@ function BacklogSection({
 function DoneSection({
     doneVersions,
     onDeleteVersion,
+    onMarkUndone,
 }: {
     doneVersions: VersionBlock[]
     onDeleteVersion: (id: string) => void
+    onMarkUndone: (id: string) => void
 }) {
     const [isExpanded, setIsExpanded] = useState(true)
     const [expandedVersions, setExpandedVersions] = useState<Set<string>>(new Set())
@@ -711,6 +719,13 @@ function DoneSection({
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                                 <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300">{version.title}</span>
                                 <span className="text-xs text-gray-400">{version.todos.length} todos</span>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onMarkUndone(version.id) }}
+                                    className="p-1 text-gray-300 hover:text-emerald-500 mr-1"
+                                    title="Move back to active"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                </button>
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onDeleteVersion(version.id) }}
                                     className="p-1 text-gray-300 hover:text-red-500"
