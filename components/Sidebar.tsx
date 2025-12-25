@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Home, Inbox, Settings, BarChart2, LogIn, LogOut, Menu, X } from 'lucide-react'
+import { Home, Inbox, Settings, BarChart2, LogIn, LogOut, Menu, X, ListTodo } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -113,6 +113,23 @@ export function Sidebar() {
                     )
                 })}
             </nav>
+
+            {/* Updates Link - Small link above user section */}
+            <div className="px-4 pb-2">
+                <Link
+                    href="/updates"
+                    className={cn(
+                        'flex items-center gap-2 text-xs py-2 px-3 rounded-lg transition-colors',
+                        pathname === '/updates'
+                            ? 'text-emerald-400 bg-emerald-900/20'
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+                    )}
+                >
+                    <ListTodo className="w-3.5 h-3.5" />
+                    Update List
+                </Link>
+            </div>
+
             <div className="border-t border-gray-800 p-4 bg-black/50">
                 {isLoading ? (
                     <div className="flex items-center justify-center py-3">
