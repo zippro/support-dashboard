@@ -26,6 +26,8 @@ export default function TicketDetail() {
     const [isEditingEmail, setIsEditingEmail] = useState(false)
     const [editedEmail, setEditedEmail] = useState('')
     const [savingEmail, setSavingEmail] = useState(false)
+    const [notes, setNotes] = useState('')
+    const [isSavingNotes, setIsSavingNotes] = useState(false)
 
 
 
@@ -94,7 +96,10 @@ export default function TicketDetail() {
                     }
                 }
 
-                if (isMounted) setTicket(ticketData)
+                if (isMounted) {
+                    setTicket(ticketData)
+                    setNotes(ticketData.notes || '')
+                }
 
                 // Fetch messages
                 const { data: messagesData, error: messagesError } = await publicSupabase
@@ -211,6 +216,25 @@ export default function TicketDetail() {
             console.error('Error updating email:', err)
         } finally {
             setSavingEmail(false)
+        }
+    }
+
+    const saveNotes = async () => {
+        if (!ticket || !isAuthenticated) return
+        setIsSavingNotes(true)
+        try {
+            const { error } = await supabase
+                .from('tickets')
+                .update({ notes })
+                .eq('id', id)
+
+            if (error) {
+                console.error('Error saving notes:', error)
+            }
+        } catch (err) {
+            console.error('Error saving notes:', err)
+        } finally {
+            setIsSavingNotes(false)
         }
     }
 
@@ -791,6 +815,21 @@ export default function TicketDetail() {
                                     </div>
                                 </div>
 
+                                <div className="mb-4">
+                                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Internal Notes</label>
+                                    <textarea
+                                        value={notes}
+                                        onChange={(e) => setNotes(e.target.value)}
+                                        onBlur={saveNotes}
+                                        placeholder="Add notes about this ticket..."
+                                        className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 resize-none"
+                                        rows={3}
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-1 text-right">
+                                        {isSavingNotes ? 'Saving...' : 'Auto-saved on blur'}
+                                    </p>
+                                </div>
+
                                 {pendingMessage?.translate && pendingMessage?.translated ? (
                                     <div className="space-y-3">
                                         <div>
@@ -924,6 +963,24 @@ export default function TicketDetail() {
 
             {/* Sidebar for Game Data */}
             <div className="w-full lg:w-80 bg-white dark:bg-gray-900 lg:border-l border-gray-200 dark:border-gray-800 overflow-y-auto p-4 h-auto lg:h-full shrink-0">
+
+                {/* Notes Section */}
+                <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Internal Notes</h3>
+                    <div className="relative">
+                        <textarea
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
+                            onBlur={saveNotes}
+                            placeholder="Add notes..."
+                            className="w-full rounded-lg border border-gray-300 bg-yellow-50/50 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none dark:border-gray-700 dark:bg-yellow-900/10 dark:text-gray-200 resize-y min-h-[100px]"
+                        />
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1">
+                            {isSavingNotes && <span className="text-[10px] text-gray-400 animate-pulse">Saving...</span>}
+                        </div>
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{ticket.game_name || 'Game Data'}</h2>
                     {ticket.project_id && ticket.unity_report_id && (
