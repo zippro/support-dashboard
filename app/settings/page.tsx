@@ -377,7 +377,7 @@ export default function SettingsPage() {
             // Fetch current period tickets
             const { data: currentTickets } = await supabase
                 .from('tickets')
-                .select('id, game_name, project_id, importance, status, original_summary, subject, created_at')
+                .select('id, game_name, project_id, importance, status, original_summary, subject, created_at, language')
                 .gte('created_at', startTime.toISOString())
 
             // Fetch previous period tickets
@@ -403,16 +403,16 @@ export default function SettingsPage() {
                 .slice(0, 3)
                 .map(([name, count]) => `• ${name}: ${count} tickets`)
 
-            // Important messages
-            const importantTickets = currentTickets?.filter(t => t.importance === 'important') || []
-            const importantList = importantTickets
+            // Translated messages
+            const translatedTickets = currentTickets?.filter(t => t.language && t.language.toLowerCase() !== 'english') || []
+            const translatedList = translatedTickets
                 .slice(0, 5)
-                .map(t => `• [${t.game_name || 'Unknown'}: "${(t.original_summary || t.subject || '').slice(0, 50)}..."](${window.location.origin}/tickets/${t.id})`)
+                .map(t => `• [${t.game_name || 'Unknown'} (${t.language}): "${(t.original_summary || t.subject || '').slice(0, 50)}..."](${window.location.origin}/tickets/${t.id})`)
 
             // Counts
             const openCount = currentTickets?.filter(t => t.status === 'open').length || 0
             const closedCount = currentTickets?.filter(t => t.status === 'closed').length || 0
-            const importantCount = importantTickets.length
+            const translatedCount = translatedTickets.length
 
             // Build Embed
             const reportTitle = isMonday ? 'Weekend Report' : 'Daily Report'
@@ -435,13 +435,13 @@ export default function SettingsPage() {
                         inline: false
                     },
                     {
-                        name: `🚨 Important Messages (${importantCount})`,
-                        value: importantList.length > 0 ? importantList.join('\n') : '• None flagged as important',
+                        name: `🌍 Translated Tickets (${translatedCount})`,
+                        value: translatedList.length > 0 ? translatedList.join('\n') : '• None',
                         inline: false
                     },
                     {
                         name: "📈 Summary",
-                        value: `Open: ${openCount} | Closed: ${closedCount} | Important: ${importantCount}`,
+                        value: `Open: ${openCount} | Closed: ${closedCount} | Translated: ${translatedCount}`,
                         inline: false
                     }
                 ],
