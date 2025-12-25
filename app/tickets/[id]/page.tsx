@@ -245,9 +245,7 @@ export default function TicketDetail() {
         // Logic to construct final message: Prefer explicit content (e.g. translated text) if provided
         let finalContent = explicitContent || newMessage
 
-        if (translate && ticket.language) {
-            finalContent += `\n\n(Translated to ${ticket.language})`
-        }
+        // Note: "Translated to Language" info is now shown in Discord notifications instead of email
 
         let translatedContent = translate ? finalContent : null // If translating, the content IS the translation
 
@@ -389,11 +387,26 @@ export default function TicketDetail() {
                                 <h1 className="text-xl font-bold text-gray-900 dark:text-white truncate">
                                     #{ticket.ticket_id} - {ticket.subject}
                                 </h1>
-                                {ticket.importance === 'important' && (
-                                    <span className="flex-shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800">
-                                        Important
-                                    </span>
-                                )}
+                                <button
+                                    onClick={async () => {
+                                        const newImportance = ticket.importance === 'important' ? 'normal' : 'important'
+                                        const { error } = await supabase
+                                            .from('tickets')
+                                            .update({ importance: newImportance })
+                                            .eq('id', id)
+                                        if (!error) {
+                                            setTicket((prev: any) => ({ ...prev, importance: newImportance }))
+                                        }
+                                    }}
+                                    className={`flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-all cursor-pointer ${ticket.importance === 'important'
+                                        ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border border-red-200 dark:border-red-800 hover:bg-red-200 dark:hover:bg-red-900/50'
+                                        : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                        }`}
+                                    title="Click to toggle importance"
+                                >
+                                    {ticket.importance === 'important' ? '🔴' : '⚪'}
+                                    {ticket.importance === 'important' ? 'Important' : 'Normal'}
+                                </button>
                             </div>
                             <div className="flex items-center flex-wrap gap-2 text-sm text-gray-500">
                                 {isEditingEmail ? (
@@ -747,20 +760,20 @@ export default function TicketDetail() {
 
                 {/* Send Confirmation Modal */}
                 {showCloseModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
+                            <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
                                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     {pendingMessage?.translate ? '🌐 Translate & Send' : '📤 Send Message'}
                                 </h3>
                                 <button
                                     onClick={() => { setShowCloseModal(false); setPendingMessage(null) }}
-                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-shrink-0"
                                 >
                                     <X className="h-5 w-5 text-gray-500" />
                                 </button>
                             </div>
-                            <div className="p-6">
+                            <div className="p-6 overflow-y-auto flex-1 min-h-0">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className={`p-3 rounded-full ${pendingMessage?.translate ? 'bg-purple-100 dark:bg-purple-900/30' : 'bg-indigo-100 dark:bg-indigo-900/30'}`}>
                                         {pendingMessage?.translate ? <Languages className="h-6 w-6 text-purple-600 dark:text-purple-400" /> : <Send className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />}
@@ -786,7 +799,7 @@ export default function TicketDetail() {
                                             <span className="text-xs font-medium">Translated from English → {ticket.language || 'User Language'}</span>
                                         </div>
                                         <div>
-                                            <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">Translated Message</p>
+                                            <p className="text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">Translated to {ticket.language || 'User Language'}</p>
                                             <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-3 border border-purple-200 dark:border-purple-800">
                                                 <textarea
                                                     value={pendingMessage.translated || ''}
