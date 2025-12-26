@@ -339,7 +339,7 @@ function TicketListContent() {
             }
             isMounted = false
         }
-    }, [statusFilter, gameFilter, dateFilter, customStartDate, customEndDate, availableGames, debouncedSearch, importanceFilter])
+    }, [statusFilter, gameFilter, dateFilter, customStartDate, customEndDate, availableGames, debouncedSearch, importanceFilter, platformFilter, versionFilter])
 
     // Initial Fetch & Filter Changes - only run after games are loaded
     useEffect(() => {
@@ -699,10 +699,10 @@ function TicketListContent() {
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">Imp.</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">ID</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Game</th>
-                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Platform</th>
-                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Version</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Status</th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Platform</th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Version</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">User</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Created</th>
                             </tr>
@@ -764,12 +764,6 @@ function TicketListContent() {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-3 py-4 whitespace-nowrap w-20">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">{ticket.platform || '-'}</span>
-                                        </td>
-                                        <td className="px-3 py-4 whitespace-nowrap w-20">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400">{ticket.app_version || '-'}</span>
-                                        </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col max-w-[400px] relative group/subject overflow-hidden">
                                                 <Link
@@ -801,6 +795,12 @@ function TicketListContent() {
                                             >
                                                 {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
                                             </button>
+                                        </td>
+                                        <td className="px-3 py-4 whitespace-nowrap w-20">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{ticket.platform || '-'}</span>
+                                        </td>
+                                        <td className="px-3 py-4 whitespace-nowrap w-20">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{ticket.app_version || '-'}</span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap w-48">
                                             <div className="flex flex-col">
