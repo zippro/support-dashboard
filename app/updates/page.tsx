@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { supabase } from '@/lib/supabase'
 import { Plus, GripVertical, Trash2, Bug, Sparkles, ChevronDown, ChevronUp, CheckCircle2, Pencil, Check, X, Package, RotateCcw } from 'lucide-react'
 
 interface TodoItem {
@@ -18,9 +19,6 @@ interface VersionBlock {
     collapsed: boolean
 }
 
-const STORAGE_KEY_VERSIONS = 'update-list-data'
-const STORAGE_KEY_BACKLOG = 'update-list-backlog'
-
 export default function UpdatesPage() {
     const [versions, setVersions] = useState<VersionBlock[]>([])
     const [backlog, setBacklog] = useState<TodoItem[]>([])
@@ -31,116 +29,170 @@ export default function UpdatesPage() {
     const [draggedItem, setDraggedItem] = useState<{ type: 'version' | 'todo'; id: string; sourceVersionId?: string; todo?: TodoItem } | null>(null)
     const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
 
-    // Load from localStorage
+    // Fetch Data from Supabase
+    const fetchData = async () => {
+        try {
+            const { data: vData, error: vError } = await supabase
+                .from('app_versions')
+                .select('*')
+                .order('position', { ascending: false })
+                .order('created_at', { ascending: false })
+
+            const { data: tData, error: tError } = await supabase
+                .from('app_todos')
+                .select('*')
+                .order('position', { ascending: true })
+                .order('created_at', { ascending: true })
+
+            if (vError) console.error('Error fetching versions:', vError)
+            if (tError) console.error('Error fetching todos:', tError)
+
+            if (vData) {
+                const versionMap = vData.map((v: any) => ({
+                    id: v.id,
+                    title: v.title,
+                    done: v.done,
+                    collapsed: v.collapsed,
+                    todos: tData ? tData.filter((t: any) => t.version_id === v.id).map((t: any) => ({
+                        id: t.id,
+                        title: t.title,
+                        type: t.type,
+                        done: t.done
+                    })) : []
+                }))
+                setVersions(versionMap)
+            }
+
+            if (tData) {
+                const backlogItems = tData.filter((t: any) => !t.version_id).map((t: any) => ({
+                    id: t.id,
+                    title: t.title,
+                    type: t.type,
+                    done: t.done
+                }))
+                setBacklog(backlogItems)
+            }
+        } catch (e) {
+            console.error('Fetch error:', e)
+        } finally {
+            setIsLoaded(true)
+        }
+    }
+
     useEffect(() => {
-        const savedVersions = localStorage.getItem(STORAGE_KEY_VERSIONS)
-        const savedBacklog = localStorage.getItem(STORAGE_KEY_BACKLOG)
-        if (savedVersions) setVersions(JSON.parse(savedVersions))
-        if (savedBacklog) setBacklog(JSON.parse(savedBacklog))
-        setIsLoaded(true)
+        fetchData()
     }, [])
 
-    // Save to localStorage
-    useEffect(() => {
-        if (!isLoaded) return
-        localStorage.setItem(STORAGE_KEY_VERSIONS, JSON.stringify(versions))
-    }, [versions, isLoaded])
-
-    useEffect(() => {
-        if (!isLoaded) return
-        localStorage.setItem(STORAGE_KEY_BACKLOG, JSON.stringify(backlog))
-    }, [backlog, isLoaded])
-
-    // Generate unique ID
-    const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
     // Add version
-    const addVersion = () => {
+    const addVersion = async () => {
         if (!newVersionTitle.trim()) return
-        const newVersion: VersionBlock = {
-            id: generateId(),
+        const { error } = await supabase.from('app_versions').insert({
             title: newVersionTitle.trim(),
-            todos: [],
             done: false,
-            collapsed: false,
+            collapsed: false
+        })
+        if (!error) {
+            setNewVersionTitle('')
+            fetchData()
         }
-        setVersions([newVersion, ...versions])
-        setNewVersionTitle('')
     }
 
     // Delete version
-    const deleteVersion = (id: string) => {
-        setVersions(versions.filter(v => v.id !== id))
+    const deleteVersion = async (id: string) => {
+        await supabase.from('app_versions').delete().eq('id', id)
+        fetchData()
     }
 
     // Toggle version collapsed
-    const toggleVersionCollapsed = (id: string) => {
+    const toggleVersionCollapsed = async (id: string) => {
+        // Optimistic
         setVersions(versions.map(v => v.id === id ? { ...v, collapsed: !v.collapsed } : v))
-    }
-
-    // Update version title
-    const updateVersionTitle = (id: string, title: string) => {
-        setVersions(versions.map(v => v.id === id ? { ...v, title } : v))
-    }
-
-    // Mark version as done
-    const markVersionDone = (id: string) => {
-        setVersions(versions.map(v => v.id === id ? { ...v, done: true, todos: v.todos.map(t => ({ ...t, done: true })) } : v))
-    }
-
-    // Mark version as undone
-    const markVersionUndone = (id: string) => {
-        setVersions(versions.map(v => v.id === id ? { ...v, done: false } : v))
-    }
-
-    // Add todo to version
-    const addTodoToVersion = (versionId: string, type: 'new' | 'bug', title: string) => {
-        if (!title.trim()) return
-        const newTodo: TodoItem = { id: generateId(), title: title.trim(), type, done: false }
-        setVersions(versions.map(v => v.id === versionId ? { ...v, todos: [...v.todos, newTodo] } : v))
-    }
-
-    // Delete todo
-    const deleteTodo = (versionId: string | null, todoId: string) => {
-        if (versionId) {
-            setVersions(versions.map(v => v.id === versionId ? { ...v, todos: v.todos.filter(t => t.id !== todoId) } : v))
-        } else {
-            setBacklog(backlog.filter(t => t.id !== todoId))
+        const v = versions.find(v => v.id === id)
+        if (v) {
+            await supabase.from('app_versions').update({ collapsed: !v.collapsed }).eq('id', id)
         }
     }
 
+    // Update version title
+    const updateVersionTitle = async (id: string, title: string) => {
+        await supabase.from('app_versions').update({ title }).eq('id', id)
+        fetchData()
+    }
+
+    // Mark version as done
+    const markVersionDone = async (id: string) => {
+        // Mark version done AND all its todos done
+        await supabase.from('app_versions').update({ done: true }).eq('id', id)
+        await supabase.from('app_todos').update({ done: true }).eq('version_id', id)
+        fetchData()
+    }
+
+    // Mark version as undone
+    const markVersionUndone = async (id: string) => {
+        await supabase.from('app_versions').update({ done: false }).eq('id', id)
+        fetchData()
+    }
+
+    // Add todo to version
+    const addTodoToVersion = async (versionId: string, type: 'new' | 'bug', title: string) => {
+        if (!title.trim()) return
+        await supabase.from('app_todos').insert({
+            version_id: versionId,
+            title: title.trim(),
+            type,
+            done: false
+        })
+        fetchData()
+    }
+
+    // Delete todo
+    const deleteTodo = async (versionId: string | null, todoId: string) => {
+        await supabase.from('app_todos').delete().eq('id', todoId)
+        fetchData()
+    }
+
     // Toggle todo done
-    const toggleTodoDone = (versionId: string | null, todoId: string) => {
-        if (versionId) {
-            setVersions(versions.map(v => {
-                if (v.id !== versionId) return v
-                const updatedTodos = v.todos.map(t => t.id === todoId ? { ...t, done: !t.done } : t)
-                // Removed auto-done logic: done status is now manual only
-                return { ...v, todos: updatedTodos }
-            }))
-        } else {
-            setBacklog(backlog.map(t => t.id === todoId ? { ...t, done: !t.done } : t))
+    const toggleTodoDone = async (versionId: string | null, todoId: string) => {
+        // We need existing status to toggle. Fetch or lookup.
+        const v = versionId ? versions.find(v => v.id === versionId) : null
+        const todo = v ? v.todos.find(t => t.id === todoId) : backlog.find(t => t.id === todoId)
+
+        if (todo) {
+            // Optimistic
+            if (versionId) {
+                setVersions(versions.map(v => v.id === versionId ? { ...v, todos: v.todos.map(t => t.id === todoId ? { ...t, done: !todo.done } : t) } : v))
+            } else {
+                setBacklog(backlog.map(t => t.id === todoId ? { ...t, done: !todo.done } : t))
+            }
+
+            await supabase.from('app_todos').update({ done: !todo.done }).eq('id', todoId)
+            // No full fetch needed if optimistic worked, but drag consistency matters.
+            // We'll skip fetchData for pure toggle to keep UI snappy, unless it fails?
         }
     }
 
     // Update todo title
-    const updateTodoTitle = (versionId: string | null, todoId: string, title: string) => {
-        if (versionId) {
-            setVersions(versions.map(v => v.id === versionId ? { ...v, todos: v.todos.map(t => t.id === todoId ? { ...t, title } : t) } : v))
-        } else {
-            setBacklog(backlog.map(t => t.id === todoId ? { ...t, title } : t))
-        }
+    const updateTodoTitle = async (versionId: string | null, todoId: string, title: string) => {
+        await supabase.from('app_todos').update({ title }).eq('id', todoId)
+        fetchData()
     }
 
     // Add to backlog
-    const addToBacklog = (type: 'new' | 'bug', title: string) => {
+    const addToBacklog = async (type: 'new' | 'bug', title: string) => {
         if (!title.trim()) return
-        const newTodo: TodoItem = { id: generateId(), title: title.trim(), type, done: false }
-        setBacklog([...backlog, newTodo])
+        await supabase.from('app_todos').insert({
+            version_id: null,
+            title: title.trim(),
+            type,
+            done: false
+        })
+        fetchData()
     }
 
     // Move version up/down
     const moveVersion = (id: string, direction: 'up' | 'down') => {
+        // Reordering not fully implemented on backend yet (requires position updates)
+        // For now just client-side shift for visual feedback, won't persist well
         const idx = versions.findIndex(v => v.id === id)
         if ((direction === 'up' && idx === 0) || (direction === 'down' && idx === versions.length - 1)) return
         const newVersions = [...versions]
@@ -151,7 +203,6 @@ export default function UpdatesPage() {
 
     // Drag handlers
     const handleDragStart = (type: 'version' | 'todo', id: string, sourceVersionId?: string) => {
-        // Find todo item immediately on drag start
         let todo: TodoItem | undefined
         if (sourceVersionId) {
             const sourceVersion = versions.find(v => v.id === sourceVersionId)
@@ -176,23 +227,20 @@ export default function UpdatesPage() {
         setDragOverTarget(null)
     }
 
-    const handleDropOnVersion = (targetVersionId: string) => {
+    const handleDropOnVersion = async (targetVersionId: string) => {
         if (!draggedItem || draggedItem.type !== 'todo' || !draggedItem.todo) {
             setDragOverTarget(null)
             return
         }
 
-        const todo = { ...draggedItem.todo }
         const sourceVersionId = draggedItem.sourceVersionId
-
-        // Don't drop on same version
         if (sourceVersionId === targetVersionId) {
             setDragOverTarget(null)
             setDraggedItem(null)
             return
         }
 
-        // Remove from source
+        // Optimistic update
         if (sourceVersionId) {
             setVersions(prev => prev.map(v =>
                 v.id === sourceVersionId
@@ -200,43 +248,47 @@ export default function UpdatesPage() {
                     : v
             ))
         } else {
-            // From backlog
             setBacklog(prev => prev.filter(t => t.id !== draggedItem.id))
         }
 
-        // Add to target version after a tick
         setTimeout(() => {
             setVersions(prev => prev.map(v =>
                 v.id === targetVersionId
-                    ? { ...v, todos: [...v.todos, todo] }
+                    ? { ...v, todos: [...v.todos, draggedItem.todo!] }
                     : v
             ))
         }, 10)
 
+        // Backend Update
+        await supabase.from('app_todos').update({ version_id: targetVersionId }).eq('id', draggedItem.id)
+
         setDraggedItem(null)
         setDragOverTarget(null)
+        // fetchData() // Optional consistency check
     }
 
-    const handleDropOnBacklog = () => {
+    const handleDropOnBacklog = async () => {
         if (!draggedItem || draggedItem.type !== 'todo' || !draggedItem.sourceVersionId || !draggedItem.todo) {
             setDragOverTarget(null)
             return
         }
 
-        const todo = { ...draggedItem.todo }
         const sourceVersionId = draggedItem.sourceVersionId
 
-        // Remove from version
+        // Optimistic
         setVersions(prev => prev.map(v =>
             v.id === sourceVersionId
                 ? { ...v, todos: v.todos.filter(t => t.id !== draggedItem.id) }
                 : v
         ))
 
-        // Add to backlog after a tick
         setTimeout(() => {
-            setBacklog(prev => [...prev, todo])
+            setBacklog(prev => [...prev, draggedItem.todo!])
         }, 10)
+
+
+        // Backend Update
+        await supabase.from('app_todos').update({ version_id: null }).eq('id', draggedItem.id)
 
         setDraggedItem(null)
         setDragOverTarget(null)
