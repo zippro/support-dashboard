@@ -29,6 +29,17 @@ export default function UpdatesPage() {
     const [draggedItem, setDraggedItem] = useState<{ type: 'version' | 'todo'; id: string; sourceVersionId?: string; todo?: TodoItem } | null>(null)
     const [dragOverTarget, setDragOverTarget] = useState<string | null>(null)
 
+    // Check for local data
+    const [hasLocalData, setHasLocalData] = useState(false)
+
+    useEffect(() => {
+        const localVersions = localStorage.getItem('versions')
+        const localBacklog = localStorage.getItem('backlog')
+        if ((localVersions && JSON.parse(localVersions).length > 0) || (localBacklog && JSON.parse(localBacklog).length > 0)) {
+            setHasLocalData(true)
+        }
+    }, [])
+
     // Fetch Data from Supabase
     const fetchData = async () => {
         try {
@@ -297,6 +308,75 @@ export default function UpdatesPage() {
     const activeVersions = versions.filter(v => !v.done)
     const doneVersions = versions.filter(v => v.done)
 
+    const migrateLocalData = async () => {
+        if (!confirm('This will upload your local data to the shared list. Continue?')) return
+
+        try {
+            const localVersions = JSON.parse(localStorage.getItem('versions') || '[]')
+            const localBacklog = JSON.parse(localStorage.getItem('backlog') || '[]')
+            const localFinished = JSON.parse(localStorage.getItem('finishedVersions') || '[]')
+
+            // Migrate Versions
+            for (const v of [...localVersions, ...localFinished]) {
+                // Insert Version
+                const { data: vData, error: vError } = await supabase
+                    .from('app_versions')
+                    .insert({
+                        title: v.title,
+                        done: v.done || false,
+                        collapsed: v.collapsed || false
+                    })
+                    .select()
+                    .single()
+
+                if (vError) {
+                    console.error('Error migrating version:', v.title, vError)
+                    continue
+                }
+
+                const newVersionId = vData.id
+
+                // Insert Todos for this version
+                if (v.todos && v.todos.length > 0) {
+                    const todosToInsert = v.todos.map((t: any) => ({
+                        version_id: newVersionId,
+                        title: t.title,
+                        type: t.type,
+                        done: t.done || false
+                    }))
+
+                    const { error: tError } = await supabase.from('app_todos').insert(todosToInsert)
+                    if (tError) console.error('Error migrating todos for version:', v.title, tError)
+                }
+            }
+
+            // Migrate Backlog
+            if (localBacklog.length > 0) {
+                const backlogToInsert = localBacklog.map((t: any) => ({
+                    version_id: null,
+                    title: t.title,
+                    type: t.type,
+                    done: t.done || false
+                }))
+
+                const { error: bError } = await supabase.from('app_todos').insert(backlogToInsert)
+                if (bError) console.error('Error migrating backlog:', bError)
+            }
+
+            // Cleanup
+            localStorage.removeItem('versions')
+            localStorage.removeItem('backlog')
+            localStorage.removeItem('finishedVersions')
+            setHasLocalData(false)
+            alert('Migration successful! Your data is now shared.')
+            fetchData()
+
+        } catch (e) {
+            console.error('Migration failed:', e)
+            alert('Migration failed. Check console for details.')
+        }
+    }
+
     if (!isLoaded) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -309,9 +389,29 @@ export default function UpdatesPage() {
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 md:p-8">
             <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Update List</h1>
-                    <p className="text-gray-500 dark:text-gray-400 mt-1">Track version updates and feature todo lists</p>
+                <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Update List</h1>
+                        <p className="text-gray-500 dark:text-gray-400 mt-1">Track version updates and feature todo lists</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        {hasLocalData && (
+                            <button
+                                onClick={migrateLocalData}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 dark:text-amber-400 dark:bg-amber-900/20 dark:hover:bg-amber-900/40 rounded-lg transition-colors border border-amber-200 dark:border-amber-800"
+                            >
+                                <RotateCcw className="w-4 h-4" />
+                                Migrate Local Data
+                            </button>
+                        )}
+                        <button
+                            onClick={fetchData}
+                            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm"
+                            title="Refresh"
+                        >
+                            <RotateCcw className="w-4 h-4" />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Add Version */}
