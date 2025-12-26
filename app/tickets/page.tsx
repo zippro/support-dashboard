@@ -17,7 +17,8 @@ import {
     Filter,
     MoreHorizontal,
     RefreshCw,
-    Lock
+    Lock,
+    X
 } from 'lucide-react'
 
 // Constants
@@ -59,6 +60,10 @@ function TicketListContent() {
     const [searchQuery, setSearchQuery] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const [importanceFilter, setImportanceFilter] = useState<string | null>(null)
+    const [platformFilter, setPlatformFilter] = useState('all')
+    const [versionFilter, setVersionFilter] = useState('all')
+    const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([])
+    const [availableVersions, setAvailableVersions] = useState<string[]>([])
     const searchParams = useSearchParams()
 
     // Selection State
@@ -136,6 +141,19 @@ function TicketListContent() {
                 setAvailableGames(uniqueGames)
                 setGameFilter(uniqueGames.map(g => g.id)) // Default Select All
             }
+
+            // 3. Fetch Unique Platforms and Versions
+            const { data: pvData } = await publicSupabase
+                .from('tickets')
+                .select('platform, app_version')
+
+            if (pvData) {
+                const platforms = Array.from(new Set(pvData.map(t => t.platform).filter(Boolean))).sort()
+                const versions = Array.from(new Set(pvData.map(t => t.app_version).filter(Boolean))).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))
+                setAvailablePlatforms(platforms)
+                setAvailableVersions(versions)
+            }
+
             setGamesLoaded(true)
         }
         fetchData()
@@ -231,9 +249,20 @@ function TicketListContent() {
             // If gameFilter is empty but we have available games, show nothing (user deselected all)
             // If availableGames is empty, don't filter by game at all (show all tickets)
 
+            // Apply Platform Filter
+            if (platformFilter !== 'all') {
+                query = query.eq('platform', platformFilter)
+            }
+
+            // Apply Version Filter
+            if (versionFilter !== 'all') {
+                query = query.eq('app_version', versionFilter)
+            }
+
             // Apply Date Filter
             const now = new Date()
             let startDate = null
+
 
             switch (dateFilter) {
                 case 'today':
@@ -487,13 +516,21 @@ function TicketListContent() {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Search subject, ID, or email..."
-                            className="w-full rounded-md border-gray-300 pl-10 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700"
+                            className="w-full rounded-md border-gray-300 pl-10 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700"
                         />
                         <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                             <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
                         </div>
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -558,6 +595,30 @@ function TicketListContent() {
                         <option value="closed">Closed</option>
                         <option value="duplicated">Duplicated</option>
                         <option value="pending">Pending</option>
+                    </select>
+
+                    {/* Platform Filter */}
+                    <select
+                        value={platformFilter}
+                        onChange={(e) => setPlatformFilter(e.target.value)}
+                        className="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700"
+                    >
+                        <option value="all">All Platforms</option>
+                        {availablePlatforms.map(p => (
+                            <option key={p} value={p}>{p}</option>
+                        ))}
+                    </select>
+
+                    {/* Version Filter */}
+                    <select
+                        value={versionFilter}
+                        onChange={(e) => setVersionFilter(e.target.value)}
+                        className="rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-800 dark:border-gray-700 max-w-[150px]"
+                    >
+                        <option value="all">All Versions</option>
+                        {availableVersions.map(v => (
+                            <option key={v} value={v}>{v}</option>
+                        ))}
                     </select>
 
                     {/* Date Filter */}
@@ -638,6 +699,8 @@ function TicketListContent() {
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-8">Imp.</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">ID</th>
                                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">Game</th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Platform</th>
+                                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Version</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subject</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Status</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">User</th>
@@ -700,6 +763,12 @@ function TicketListContent() {
                                                     {getGameName(ticket.project_id)}
                                                 </span>
                                             </div>
+                                        </td>
+                                        <td className="px-3 py-4 whitespace-nowrap w-20">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{ticket.platform || '-'}</span>
+                                        </td>
+                                        <td className="px-3 py-4 whitespace-nowrap w-20">
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">{ticket.app_version || '-'}</span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="flex flex-col max-w-[400px] relative group/subject overflow-hidden">
