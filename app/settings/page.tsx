@@ -377,7 +377,7 @@ export default function SettingsPage() {
             // Fetch current period tickets
             const { data: currentTickets } = await supabase
                 .from('tickets')
-                .select('id, game_name, project_id, importance, status, original_summary, summary, subject, created_at, language')
+                .select('id, game_name, project_id, importance, status, original_summary, translated_summary, subject, created_at, language')
                 .gte('created_at', startTime.toISOString())
 
             // Fetch previous period tickets
@@ -408,7 +408,7 @@ export default function SettingsPage() {
             const importantList = importantTickets
                 .slice(0, 5)
                 .map((t: any) => {
-                    const text = t.summary || t.original_summary || t.subject || ''
+                    const text = t.translated_summary || t.original_summary || t.subject || ''
                     return `• [${t.game_name || 'Unknown'}: "${text.slice(0, 60)}..."](${window.location.origin}/tickets/${t.id})`
                 })
 
